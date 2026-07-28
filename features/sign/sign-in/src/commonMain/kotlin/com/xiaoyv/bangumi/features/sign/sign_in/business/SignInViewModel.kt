@@ -9,6 +9,7 @@ import com.xiaoyv.bangumi.shared.core.utils.debugLog
 import com.xiaoyv.bangumi.shared.core.utils.errMsg
 import com.xiaoyv.bangumi.shared.data.manager.app.UserManager
 import com.xiaoyv.bangumi.shared.data.model.request.LoginParam
+import com.xiaoyv.bangumi.shared.data.model.response.bgm.ComposeAuthToken
 import com.xiaoyv.bangumi.shared.data.model.response.bgm.ComposeLoginResult
 import com.xiaoyv.bangumi.shared.data.repository.SignRepository
 import com.xiaoyv.bangumi.shared.data.repository.UserRepository
@@ -40,6 +41,10 @@ class SignInViewModel(
             is SignInEvent.Action.OnCodeChange -> onCodeChange(event.code)
             is SignInEvent.Action.OnSignIn -> onSignIn()
             is SignInEvent.Action.OnRefreshVerifyCode -> onRefreshVerifyCodeImage()
+            is SignInEvent.Action.OnTokenLogin -> onTokenLogin()
+            is SignInEvent.Action.OnCookieLogin -> onCookieLogin()
+            is SignInEvent.Action.OnTokenInputChange -> onTokenInputChange(event.token)
+            is SignInEvent.Action.OnCookieInputChange -> onCookieInputChange(event.cookie)
         }
     }
 
@@ -53,6 +58,14 @@ class SignInViewModel(
 
     private fun onEmailChange(value: TextFieldValue) = action {
         reduceContent { state.copy(email = value) }
+    }
+
+    private fun onTokenInputChange(value: TextFieldValue) = action {
+        reduceContent { state.copy(tokenInput = value) }
+    }
+
+    private fun onCookieInputChange(value: TextFieldValue) = action {
+        reduceContent { state.copy(cookieInput = value) }
     }
 
     private fun onRefreshVerifyCodeImage() = action {
@@ -152,6 +165,129 @@ class SignInViewModel(
 
                 postEffect { SignInSideEffect.OnLoginResult(it) }
             }
+        }
+    }
+
+    /**
+     * Token 直接登录
+     *
+     * 用户粘贴 Access Token，直接验证并保存
+     */
+    private fun onTokenLogin() = action {
+        val token = state.content.tokenInput.text.trim()
+        if (token.isBlank()) {
+            postToast { "请输入 Access Token" }
+            return@action
+        }
+
+        reduceContent { state.copy(altLoginRunning = true) }
+
+        runCatching {
+            // 1. 构造 Token 对象并保存
+            val authToken = ComposeAuthToken(
+                accessToken = token,
+                expiresIn = 604800,
+                tokenType = "Bearer",
+                saveAt = com.xiaoyv.bangumi.shared.System.currentTimeMillis()
+            )
+            userManager.setToken(authToken)
+
+            // 2. 验证 Token（调用 v0/me）
+            val apiUser = userRepository.validateToken().getOrThrow()
+
+            // 3. 获取完整用户信息
+            val fullUser = userRepository.fetchUserInfo(apiUser.username).getOrThrow()
+            val userInfo = fullUser.copy(id = apiUser.id, group = apiUser.group)
+
+            // 4. 保存用户信息
+            userManager.login(userInfo, authToken.copy(userId = apiUser.id))
+
+            debugLog { "Token 登录成功: $userInfo" }
+
+            userInfo to authToken
+        }.onFailure {
+            userManager.setToken(ComposeAuthToken.Empty)
+            reduceContent { state.copy(altLoginRunning = false) }
+            postToast { "Token 无效，请检查后重试" }
+            debugLog { "Token 登录失败: ${it.message}" }
+        }.onSuccess {
+            reduceContent {
+                state.copy(
+                    altLoginRunning = false,
+                    loginResult = ComposeLoginResult(
+                        success = true,
+                        message = "Token 登录成功",
+                        composeUser = it.first
+                    )
+                )
+            }
+            postEffect {
+                SignInSideEffect.OnLoginResult(
+                    ComposeLoginResult(success = true, message = "Token 登录成功")
+                )
+            }
+        }
+    }
+
+    /**
+     * Cookie 辅助登录
+     *
+     * 用户粘贴浏览器 Cookie，通过 OAuth 流程获取 Token
+     */
+    private fun onCookieLogin() = action {
+        val cookieString = state.content.cookieInput.text.trim()
+        if (cookieString.isBlank()) {
+            postToast { "请粘贴 Cookie" }
+            return@action
+        }
+
+        if (!cookieString.contains("chii_auth")) {
+            postToast { "Cookie 中未找到 chii_auth，请确保已登录 bgm.tv" }
+            return@action
+        }
+
+        reduceContent { state.copy(altLoginRunning = true) }
+
+        runCatching {
+            // 1. 保存 Cookie 到存储
+            userRepository.saveCookie(cookieString).getOrThrow()
+
+            // 2. 获取登录表单（验证 Cookie 是否有效）
+            val loginForm = signRepo.fetchLoginForm().getOrThrow()
+            require(loginForm.hasLogin && loginForm.loginInfo.success) {
+                "Cookie 无效或已过期，请检查后重试"
+            }
+
+            val composeUser = loginForm.loginInfo.composeUser
+            val formHash = composeUser.formHash
+            require(formHash.isNotBlank()) { "无法获取授权表单码" }
+
+            // 3. 通过 formHash 创建 OAuth Token
+            val token = userRepository.submitRequestToken(formHash).getOrThrow()
+
+            // 4. 获取完整用户信息
+            val fullUser = userRepository.fetchUserInfo(composeUser.username).getOrThrow()
+            val userInfo = fullUser.copy(
+                id = composeUser.id,
+                group = composeUser.group,
+                formHash = formHash
+            )
+
+            // 5. 保存用户信息和 Token
+            userManager.login(userInfo, token)
+
+            debugLog { "Cookie 登录成功: $userInfo" }
+
+            userInfo to loginForm.loginInfo
+        }.onFailure {
+            reduceContent { state.copy(altLoginRunning = false) }
+            postToast { it.message ?: "Cookie 登录失败" }
+            debugLog { "Cookie 登录失败: ${it.message}" }
+        }.onSuccess {
+            reduceContent {
+                state.copy(altLoginRunning = false, loginResult = it.second)
+            }
+            postEffect { SignInSideEffect.OnLoginResult(it.second) }
         }
     }
 

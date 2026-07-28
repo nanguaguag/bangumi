@@ -2,6 +2,7 @@ package com.xiaoyv.bangumi.shared.data.repository
 
 import com.xiaoyv.bangumi.shared.core.types.SubjectType
 import com.xiaoyv.bangumi.shared.data.model.request.IndexTarget
+import com.xiaoyv.bangumi.shared.data.model.response.bgm.index.ComposeCatalogItem
 import com.xiaoyv.bangumi.shared.data.model.response.bgm.index.ComposeIndex
 import com.xiaoyv.bangumi.shared.data.model.response.bgm.subject.ComposeSubject
 
@@ -17,4 +18,7 @@ interface IndexRepository {
     suspend fun submitBookmarkOrCancelIndex(indexId: Long, bookmarked: Boolean): Result<Boolean>
 
     suspend fun submitIndexAddRelated(indexId: Long, target: IndexTarget): Result<Unit>
+
+    /** 加载精选目录离线数据 */
+    suspend fun fetchFeaturedCatalogs(): Result<List<ComposeCatalogItem>>
 }

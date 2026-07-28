@@ -68,6 +68,8 @@ import com.xiaoyv.bangumi.core_resource.resources.ic_process
 import com.xiaoyv.bangumi.core_resource.resources.ic_show
 import com.xiaoyv.bangumi.core_resource.resources.ic_tag
 import com.xiaoyv.bangumi.core_resource.resources.ic_timeline
+import com.xiaoyv.bangumi.core_resource.resources.index_advance
+import com.xiaoyv.bangumi.core_resource.resources.index_featured
 import com.xiaoyv.bangumi.core_resource.resources.search_match_e
 import com.xiaoyv.bangumi.core_resource.resources.search_match_m
 import com.xiaoyv.bangumi.core_resource.resources.search_sort_date
@@ -329,6 +331,8 @@ object TabTokens {
         ComposeTextTab(GroupSortType.CREATED, Res.string.type_group_created),
     )
     val mainHomeIndexFilters = persistentListOf(
+        ComposeTextTab(IndexHomepageType.FEATURED, Res.string.index_featured),
+        ComposeTextTab(IndexHomepageType.ADVANCE, Res.string.index_advance),
         ComposeTextTab(IndexHomepageType.HOT, Res.string.global_hot),
         ComposeTextTab(IndexHomepageType.NEWEST, Res.string.global_newest),
     )

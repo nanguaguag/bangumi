@@ -63,6 +63,16 @@ interface UserRepository {
 
     suspend fun submitRefreshToken(refreshToken: String): Result<ComposeAuthToken>
 
+    /**
+     * 验证 Token 是否有效（通过 v0/me API）
+     */
+    suspend fun validateToken(): Result<ComposeUser>
+
+    /**
+     * 保存用户粘贴的 Cookie 字符串到 CookieStorage
+     */
+    suspend fun saveCookie(cookieString: String): Result<Unit>
+
     suspend fun submitUserInfoUpdate(avatarBytes: ByteArray, parts: Map<String, String>): Result<Unit>
 
     suspend fun submitMarkNotificationRead(notificationId: Long): Result<Unit>

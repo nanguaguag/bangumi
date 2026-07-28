@@ -10,6 +10,8 @@ data class IndexSearchBody(
     @SerialName("keyword") val keyword: String = "",
     @SerialName("exact") val exact: Boolean = false,
     @SerialName("order") val order: String = "updated_at",
+    @SerialName("type") val type: String = "",
+    @SerialName("year") val year: String = "",
 ) {
     companion object {
         val Empty = IndexSearchBody()

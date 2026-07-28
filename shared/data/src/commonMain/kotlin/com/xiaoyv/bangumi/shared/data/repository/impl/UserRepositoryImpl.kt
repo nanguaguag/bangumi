@@ -321,5 +321,30 @@ class UserRepositoryImpl(
         )
     }
 
+    override suspend fun validateToken(): Result<ComposeUser> = client.requestJsonApi {
+        fetchUserProfile()
+    }
+
+    override suspend fun saveCookie(cookieString: String): Result<Unit> = runResult {
+        val bgmUrl = io.ktor.http.Url(client.baseUrl)
+        cookieString.split(";").forEach { part ->
+            val trimmed = part.trim()
+            val eqIndex = trimmed.indexOf('=')
+            if (eqIndex > 0) {
+                val name = trimmed.substring(0, eqIndex).trim()
+                val value = trimmed.substring(eqIndex + 1).trim()
+                if (name.isNotBlank()) {
+                    val cookie = io.ktor.http.Cookie(
+                        name = name,
+                        value = value,
+                        domain = bgmUrl.host,
+                        path = "/"
+                    )
+                    client.cookieStorage.addCookie(bgmUrl, cookie)
+                }
+            }
+        }
+    }
+
 
 }

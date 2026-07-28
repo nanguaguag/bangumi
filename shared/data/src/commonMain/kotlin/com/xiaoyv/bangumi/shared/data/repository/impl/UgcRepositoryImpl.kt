@@ -252,6 +252,8 @@ class UgcRepositoryImpl(
                             client.appApi.fetchSearchIndex(
                                 keyword = param.search.keyword,
                                 exact = param.search.exact,
+                                type = param.search.type,
+                                year = param.search.year,
                                 page = page,
                                 size = pagingConfig.pageSize
                             ).data.records.map { it.toComposeIndex() }

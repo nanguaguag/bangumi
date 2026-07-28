@@ -80,7 +80,7 @@ import kotlin.coroutines.CoroutineContext
  */
 @AppDsl
 class BgmApiClient(
-    private val cookieStorage: BgmCookieStorage,
+    val cookieStorage: BgmCookieStorage,
     private val preferenceStore: PreferenceStore,
 ) {
     private val config get() = preferenceStore.settings.network

@@ -1,15 +1,20 @@
 package com.xiaoyv.bangumi.shared.data.repository.impl
 
 import androidx.paging.PagingConfig
+import com.xiaoyv.bangumi.core_resource.resources.Res
 import com.xiaoyv.bangumi.shared.core.types.IndexCatWebTabType
 import com.xiaoyv.bangumi.shared.core.types.SubjectType
+import com.xiaoyv.bangumi.shared.core.utils.runResult
 import com.xiaoyv.bangumi.shared.data.api.client.BgmApiClient
 import com.xiaoyv.bangumi.shared.data.manager.app.PreferenceStore
 import com.xiaoyv.bangumi.shared.data.model.request.IndexTarget
+import com.xiaoyv.bangumi.shared.data.model.response.bgm.index.ComposeCatalogItem
 import com.xiaoyv.bangumi.shared.data.model.response.bgm.index.ComposeIndex
 import com.xiaoyv.bangumi.shared.data.model.response.bgm.subject.ComposeSubject
 import com.xiaoyv.bangumi.shared.data.model.response.bgm.loadAllData
 import com.xiaoyv.bangumi.shared.data.repository.IndexRepository
+import kotlinx.serialization.json.Json
+import org.jetbrains.compose.resources.ExperimentalResourceApi
 
 class IndexRepositoryImpl(
     private val client: BgmApiClient,
@@ -64,5 +69,12 @@ class IndexRepositoryImpl(
             limit = limit,
             offset = offset
         ).result
+    }
+
+    @OptIn(ExperimentalResourceApi::class)
+    override suspend fun fetchFeaturedCatalogs(): Result<List<ComposeCatalogItem>> = runResult {
+        val json = Json { ignoreUnknownKeys = true }
+        val text = Res.readBytes("files/catalog/catalog_index.json").decodeToString()
+        json.decodeFromString<List<ComposeCatalogItem>>(text)
     }
 }

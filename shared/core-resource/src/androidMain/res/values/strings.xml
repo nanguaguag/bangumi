@@ -198,6 +198,27 @@
     <string name="login_first">请先登录后才能继续进行</string>
     <string name="login_first_tip">请先登录~</string>
     <string name="login_result_error">登录出错</string>
+    <string name="login_token_title">Token 登录</string>
+    <string name="login_token_hint">粘贴你的 Access Token</string>
+    <string name="login_token_desc">从 Bangumi 开发者设置页面获取 Access Token，直接登录</string>
+    <string name="login_cookie_title">Cookie 登录</string>
+    <string name="login_cookie_hint">粘贴浏览器 Cookie</string>
+    <string name="login_cookie_desc">在浏览器中登录 bgm.tv 后，从开发者工具复制 Cookie 粘贴至此处</string>
+    <string name="login_other_methods">其它登录方式</string>
+    <string name="login_paste">粘贴</string>
+    <string name="login_token_invalid">Token 无效，请检查后重试</string>
+    <string name="login_cookie_invalid">Cookie 无效或已过期，请检查后重试</string>
+    <string name="login_cookie_no_session">Cookie 中未找到有效的登录会话</string>
+    <string name="login_success">登录成功</string>
+    <string name="index_advance">整合</string>
+    <string name="index_featured">精选</string>
+    <string name="index_my_index">我的目录</string>
+    <string name="index_filter_type">类型</string>
+    <string name="index_filter_year">时间</string>
+    <string name="index_filter_all">不限</string>
+    <string name="index_filter_recent_1y">近1年</string>
+    <string name="index_filter_recent_3y">近3年</string>
+    <string name="index_filter_keyword">关键字</string>
 
     <string name="settings_title">设置中心</string>
     <string name="settings_account">账号设置</string>

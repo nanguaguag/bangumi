@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,17 +59,21 @@ import coil3.compose.AsyncImage
 import com.xiaoyv.bangumi.core_resource.resources.Res
 import com.xiaoyv.bangumi.core_resource.resources.global_email
 import com.xiaoyv.bangumi.core_resource.resources.global_load_error
+import com.xiaoyv.bangumi.core_resource.resources.global_loading
 import com.xiaoyv.bangumi.core_resource.resources.global_login
 import com.xiaoyv.bangumi.core_resource.resources.global_password
 import com.xiaoyv.bangumi.core_resource.resources.global_timeout
+import com.xiaoyv.bangumi.core_resource.resources.login_cookie_title
 import com.xiaoyv.bangumi.core_resource.resources.login_email
 import com.xiaoyv.bangumi.core_resource.resources.login_no_account
+import com.xiaoyv.bangumi.core_resource.resources.login_other_methods
 import com.xiaoyv.bangumi.core_resource.resources.login_password
 import com.xiaoyv.bangumi.core_resource.resources.login_result_error
 import com.xiaoyv.bangumi.core_resource.resources.login_result_known
 import com.xiaoyv.bangumi.core_resource.resources.login_result_tip
 import com.xiaoyv.bangumi.core_resource.resources.login_signup_now
 import com.xiaoyv.bangumi.core_resource.resources.login_title
+import com.xiaoyv.bangumi.core_resource.resources.login_token_title
 import com.xiaoyv.bangumi.core_resource.resources.login_verify_code
 import com.xiaoyv.bangumi.features.sign.sign_in.business.SignInEvent
 import com.xiaoyv.bangumi.features.sign.sign_in.business.SignInSideEffect
@@ -79,7 +84,9 @@ import com.xiaoyv.bangumi.shared.core.types.LoadingState
 import com.xiaoyv.bangumi.shared.ui.component.bar.BgmLargeTopAppBar
 import com.xiaoyv.bangumi.shared.ui.component.button.LoadingButton
 import com.xiaoyv.bangumi.shared.ui.component.dialog.alert.AlertDialogState
+import com.xiaoyv.bangumi.shared.ui.component.dialog.alert.BgmAlertInputDialog
 import com.xiaoyv.bangumi.shared.ui.component.dialog.alert.BgmAlertDialog
+import com.xiaoyv.bangumi.shared.ui.component.dialog.alert.rememberAlertInputDialogState
 import com.xiaoyv.bangumi.shared.ui.component.dialog.alert.rememberAlertDialogState
 import com.xiaoyv.bangumi.shared.ui.component.layout.adaptive.AdaptiveLayout
 import com.xiaoyv.bangumi.shared.ui.component.layout.state.StateLayout
@@ -103,6 +110,11 @@ fun SignInRoute(
             dismissOnClickOutside = false
         )
     )
+    val tokenInputDialogState = rememberAlertInputDialogState()
+    val cookieInputDialogState = rememberAlertInputDialogState()
+
+    val tokenLoginTitle = stringResource(Res.string.login_token_title)
+    val cookieLoginTitle = stringResource(Res.string.login_cookie_title)
 
     viewModel.collectBaseSideEffect {
         when (it) {
@@ -120,6 +132,28 @@ fun SignInRoute(
                 is SignInEvent.UI.OnNavUp -> onNavUp()
             }
         },
+        onShowTokenDialog = {
+            tokenInputDialogState.show {
+                it.copy(
+                    title = tokenLoginTitle,
+                    value = "",
+                    singleLine = true,
+                    minLines = 1,
+                    maxLines = 1
+                )
+            }
+        },
+        onShowCookieDialog = {
+            cookieInputDialogState.show {
+                it.copy(
+                    title = cookieLoginTitle,
+                    value = "",
+                    singleLine = false,
+                    minLines = 3,
+                    maxLines = 6
+                )
+            }
+        },
     )
 
     baseState.content {
@@ -130,6 +164,26 @@ fun SignInRoute(
             onNavUp = onNavUp
         )
     }
+
+    // Token 登录输入对话框
+    BgmAlertInputDialog(
+        state = tokenInputDialogState,
+        confirm = stringResource(Res.string.global_login),
+        onConfirm = { data ->
+            viewModel.onEvent(SignInEvent.Action.OnTokenInputChange(TextFieldValue(data.value)))
+            viewModel.onEvent(SignInEvent.Action.OnTokenLogin)
+        }
+    )
+
+    // Cookie 登录输入对话框
+    BgmAlertInputDialog(
+        state = cookieInputDialogState,
+        confirm = stringResource(Res.string.global_login),
+        onConfirm = { data ->
+            viewModel.onEvent(SignInEvent.Action.OnCookieInputChange(TextFieldValue(data.value)))
+            viewModel.onEvent(SignInEvent.Action.OnCookieLogin)
+        }
+    )
 }
 
 @Composable
@@ -158,6 +212,8 @@ private fun SignInScreen(
     baseState: BaseState<SignInState>,
     onUiEvent: (SignInEvent.UI) -> Unit,
     onActionEvent: (SignInEvent.Action) -> Unit,
+    onShowTokenDialog: () -> Unit = {},
+    onShowCookieDialog: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -182,10 +238,10 @@ private fun SignInScreen(
         ) { state ->
             AdaptiveLayout(
                 compat = {
-                    SignInScreenContent(state, onUiEvent, onActionEvent)
+                    SignInScreenContent(state, onUiEvent, onActionEvent, onShowTokenDialog, onShowCookieDialog)
                 },
                 other = {
-                    SignInScreenContent(state, onUiEvent, onActionEvent)
+                    SignInScreenContent(state, onUiEvent, onActionEvent, onShowTokenDialog, onShowCookieDialog)
                 },
             )
         }
@@ -198,6 +254,8 @@ private fun SignInScreenContent(
     state: SignInState,
     onUiEvent: (SignInEvent.UI) -> Unit,
     onActionEvent: (SignInEvent.Action) -> Unit,
+    onShowTokenDialog: () -> Unit = {},
+    onShowCookieDialog: () -> Unit = {},
 ) {
     val emailFocusRequester = remember { FocusRequester() }
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
@@ -338,6 +396,64 @@ private fun SignInScreenContent(
                     }
                 ) {
                     Text(text = stringResource(Res.string.global_login))
+                }
+            }
+        }
+
+        // 其它登录方式
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = contentMargin)
+                .padding(top = 32.dp, bottom = 24.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                HorizontalDivider(modifier = Modifier.weight(1f))
+                Text(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    text = stringResource(Res.string.login_other_methods),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                HorizontalDivider(modifier = Modifier.weight(1f))
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+            ) {
+                TextButton(onClick = onShowTokenDialog) {
+                    Text(text = stringResource(Res.string.login_token_title))
+                }
+
+                TextButton(onClick = onShowCookieDialog) {
+                    Text(text = stringResource(Res.string.login_cookie_title))
+                }
+            }
+
+            if (state.altLoginRunning) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Text(
+                        modifier = Modifier.padding(start = 8.dp),
+                        text = stringResource(Res.string.global_loading),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

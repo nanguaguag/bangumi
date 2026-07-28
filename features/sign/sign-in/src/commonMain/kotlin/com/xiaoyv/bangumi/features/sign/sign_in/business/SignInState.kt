@@ -25,6 +25,12 @@ data class SignInState(
     val otherForms: SerializeMap<String, String> = persistentMapOf(),
     val loginResult: ComposeLoginResult = ComposeLoginResult.Empty,
     val loggingRunning: Boolean = false,
+    /** Token 登录输入 */
+    val tokenInput: TextFieldValue = TextFieldValue(),
+    /** Cookie 登录输入 */
+    val cookieInput: TextFieldValue = TextFieldValue(),
+    /** 替代登录（Token/Cookie）是否正在执行 */
+    val altLoginRunning: Boolean = false,
 ) {
     /**
      * 是否可以登录

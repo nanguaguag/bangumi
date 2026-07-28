@@ -3,6 +3,7 @@ package com.xiaoyv.bangumi.features.main.tab.home.business
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
+import com.xiaoyv.bangumi.shared.core.types.IndexHomepageType
 import com.xiaoyv.bangumi.shared.core.types.SubjectWebPath
 import com.xiaoyv.bangumi.shared.core.types.list.ListBlogType
 import com.xiaoyv.bangumi.shared.core.types.list.ListGroupType
@@ -12,6 +13,7 @@ import com.xiaoyv.bangumi.shared.data.model.emnu.GroupFilterMode
 import com.xiaoyv.bangumi.shared.data.model.request.list.blog.ListBlogParam
 import com.xiaoyv.bangumi.shared.data.model.request.list.group.ListGroupBrowserParam
 import com.xiaoyv.bangumi.shared.data.model.request.list.group.ListGroupParam
+import com.xiaoyv.bangumi.shared.data.model.request.list.index.IndexSearchBody
 import com.xiaoyv.bangumi.shared.data.model.request.list.index.ListIndexParam
 import com.xiaoyv.bangumi.shared.data.model.response.bgm.ComposeHomeSection
 import com.xiaoyv.bangumi.shared.data.model.response.bgm.ComposeHomepageCard
@@ -65,12 +67,37 @@ data class HomeState(
     }
 
     @Composable
-    fun rememberListIndexParam(order: String): ListIndexParam {
-        return remember(order) {
-            ListIndexParam(
-                type = ListIndexType.BROWSER,
-                browserOrder = order
-            )
+    fun rememberListIndexParam(
+        order: String,
+        filterType: String = "",
+        filterYear: String = "",
+        filterKeyword: String = "",
+    ): ListIndexParam {
+        return remember(order, filterType, filterYear, filterKeyword) {
+            if (order == IndexHomepageType.ADVANCE && filterKeyword.isNotBlank()) {
+                // 整合模式 + 有关键词：使用搜索 API
+                ListIndexParam(
+                    type = ListIndexType.SEARCH,
+                    search = IndexSearchBody(
+                        keyword = filterKeyword,
+                        exact = false,
+                        order = "updated_at",
+                        type = filterType,
+                        year = filterYear,
+                    )
+                )
+            } else if (order == IndexHomepageType.ADVANCE) {
+                // 整合模式 + 无关键词：回退到浏览 API（按更新时间排序）
+                ListIndexParam(
+                    type = ListIndexType.BROWSER,
+                    browserOrder = ""
+                )
+            } else {
+                ListIndexParam(
+                    type = ListIndexType.BROWSER,
+                    browserOrder = order
+                )
+            }
         }
     }
 

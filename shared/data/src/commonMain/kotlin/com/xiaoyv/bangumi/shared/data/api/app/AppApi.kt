@@ -25,6 +25,8 @@ interface AppApi {
         @Query("keyword") keyword: String,
         @Query("exact") exact: Boolean,
         @Query("order") order: String = "updated_at",
+        @Query("type") type: String = "",
+        @Query("year") year: String = "",
         @Query("current") page: Int,
         @Query("size") size: Int,
     ): ComposeAppResponse<ComposeAppPage<ComposeSearchIndex>>

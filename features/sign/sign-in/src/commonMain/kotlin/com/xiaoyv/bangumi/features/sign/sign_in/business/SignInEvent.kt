@@ -19,5 +19,11 @@ sealed class SignInEvent {
         data class OnEmailChange(val email: TextFieldValue) : Action()
         data class OnPasswordChange(val password: TextFieldValue) : Action()
         data class OnCodeChange(val code: TextFieldValue) : Action()
+        /** Token 直接登录 */
+        data object OnTokenLogin : Action()
+        /** Cookie 辅助登录 */
+        data object OnCookieLogin : Action()
+        data class OnTokenInputChange(val token: TextFieldValue) : Action()
+        data class OnCookieInputChange(val cookie: TextFieldValue) : Action()
     }
 }
