@@ -84,7 +84,7 @@ data class ComposeSetting(
         @SerialName("connectTimeoutMillis") val connectTimeoutMillis: Long = 15_000,
         @SerialName("socketTimeoutMillis") val socketTimeoutMillis: Long = 15_000,
 
-        @SerialName("pixivImageHost") val pixivImageHost: String = "https://xget.xiaoyv.com.cn/pximg/",
+        @SerialName("pixivImageHost") val pixivImageHost: String = "https://i.pixiv.re/",
         @SerialName("pixivClientId") val pixivClientId: String = "MOBrBDS8blbauoSck0ZfDbtuzpyT",
         @SerialName("pixivClientSecret") val pixivClientSecret: String = "lsACyCD94FhDUtGTXi3QzcFE2uU1hqtDaKeqrdwj",
         @SerialName("pixivVersion") val pixivVersion: String = "6.141.1",

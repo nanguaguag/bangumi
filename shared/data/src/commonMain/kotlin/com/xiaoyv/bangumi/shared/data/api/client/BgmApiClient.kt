@@ -65,8 +65,11 @@ import io.ktor.client.HttpClientConfig
 import io.ktor.client.plugins.auth.Auth
 import io.ktor.client.plugins.auth.providers.BearerTokens
 import io.ktor.client.plugins.auth.providers.bearer
+import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
@@ -263,6 +266,10 @@ class BgmApiClient(
                 append(systemDevice.deviceModel)
                 append(")")
             }
+        }
+
+        defaultRequest {
+            header(HttpHeaders.Referrer, "https://app-api.pixiv.net/")
         }
 
         install(Auth) {

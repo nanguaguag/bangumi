@@ -1,14 +1,14 @@
 package com.xiaoyv.bangumi.shared.data.api
 
 import com.xiaoyv.bangumi.shared.core.types.AppDsl
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllustDetailResult
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllustSearchResult
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivToken
-import de.jensklingenberg.ktorfit.Response
 import de.jensklingenberg.ktorfit.http.Field
 import de.jensklingenberg.ktorfit.http.FormUrlEncoded
 import de.jensklingenberg.ktorfit.http.GET
 import de.jensklingenberg.ktorfit.http.POST
 import de.jensklingenberg.ktorfit.http.Query
-import io.ktor.client.statement.HttpResponse
 
 /**
  * [PixivApi]
@@ -42,15 +42,26 @@ interface PixivApi {
     @GET("https://app-api.pixiv.net/v1/search/illust")
     suspend fun searchIllust(
         @Query("word") word: String,
-        @Query("search_target") searchTarget: String = "exact_match_for_tags", // enum可定义: partial_match_for_tags, exact_match_for_tags, title_and_caption
-        @Query("sort") sort: String = "date_desc", // enum: date_desc, date_asc, popular_desc
-        @Query("duration") duration: String? = null, // enum: within_last_day, within_last_week, within_last_month
-        @Query("start_date") startDate: String? = null, // 格式: yyyy-MM-dd
-        @Query("end_date") endDate: String? = null, // 格式: yyyy-MM-dd
-        @Query("filter") filter: String = "for_ios",
+        @Query("search_target") searchTarget: String = "exact_match_for_tags",
+        @Query("sort") sort: String = "date_desc",
+        @Query("duration") duration: String? = null,
+        @Query("start_date") startDate: String? = null,
+        @Query("end_date") endDate: String? = null,
+        @Query("filter") filter: String = "for_android",
+        @Query("include_translated_tag_results") includeTranslatedTagResults: Boolean = true,
         @Query("search_ai_type") searchAiType: Int? = null,
         @Query("offset") offset: Int? = null,
-    ): Response<HttpResponse>
+    ): ComposePixivIllustSearchResult
+
+    /**
+     * 获取插画作品详情（含多页原图信息）。
+     *
+     * @param illustId 作品 ID。
+     */
+    @GET("https://app-api.pixiv.net/v1/illust/detail")
+    suspend fun getIllustDetail(
+        @Query("illust_id") illustId: Long,
+    ): ComposePixivIllustDetailResult
 
     @FormUrlEncoded
     @POST("https://oauth.secure.pixiv.net/auth/token")

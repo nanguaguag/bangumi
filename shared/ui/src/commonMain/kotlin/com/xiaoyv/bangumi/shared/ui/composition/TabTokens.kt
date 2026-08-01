@@ -423,12 +423,11 @@ object TabTokens {
         }.toPersistentList()
 
     val settingPixivImgHosts = persistentListOf(
-        ComposeTextTab("https://xget.xiaoyv.com.cn/pximg/", labelText = "xget.xiaoyv.com.cn"),
+        ComposeTextTab("https://i.pixiv.re/", labelText = "i.pixiv.re"),
+        ComposeTextTab("https://i.pixiv.ln/", labelText = "i.pixiv.ln"),
         ComposeTextTab("https://imp.pximg.net/", labelText = "imp.pximg.net"),
         ComposeTextTab("https://source.pximg.net/", labelText = "source.pximg.net"),
         ComposeTextTab("https://i-f.pximg.net/", labelText = "i-f.pximg.net"),
-        ComposeTextTab("https://i.pixiv.re/", labelText = "i.pixiv.re"),
-        ComposeTextTab("https://i.pixiv.ln/", labelText = "i.pixiv.ln"),
     )
 
     val settingUpdateChannels = persistentListOf(

@@ -5,8 +5,6 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import com.xiaoyv.bangumi.shared.core.types.list.ListAlbumType
 import com.xiaoyv.bangumi.shared.core.utils.parseHtmlHexColor
-import com.xiaoyv.bangumi.shared.core.utils.pixivNormalUrl
-import com.xiaoyv.bangumi.shared.core.utils.pixivOriginalUrl
 import com.xiaoyv.bangumi.shared.core.utils.runResult
 import com.xiaoyv.bangumi.shared.core.utils.toApiOffset
 import com.xiaoyv.bangumi.shared.data.api.client.BgmApiClient
@@ -77,30 +75,27 @@ class ImageRepositoryImpl(
 
     override fun fetchPixivPictures(tag: String): Pager<Int, ComposeGallery> {
         return createNetworkPageLimitPagingPager(
-            pagingConfig = createPagingConfig(60),
+            pagingConfig = createPagingConfig(30),
             keySelector = { it.id },
             onLoadData = { page ->
-                val picture = client.imageApi.fetchPixivPictures(
-                    tag = tag,
-                    page = page,
+                val result = client.pixivApi.searchIllust(
+                    word = tag,
+                    searchTarget = "partial_match_for_tags",
+                    sort = "date_desc",
+                    offset = (page - 1) * 30,
                 )
-                picture.body?.illust?.data.orEmpty().map {
-                    val pixivOriginalUrl = it.url
-                        .orEmpty()
-                        .ifBlank { it.urls?.regular }
-                        .orEmpty()
-                        .pixivOriginalUrl()
-
-                    val pixivNormalUrl = pixivOriginalUrl.pixivNormalUrl()
+                result.illusts.filter { it.visible }.map { illust ->
+                    val originalUrl = illust.originalUrl.orEmpty()
+                    val previewUrl = illust.previewUrl.orEmpty()
 
                     ComposeGallery(
-                        id = it.id.orEmpty(),
+                        id = illust.id.toString(),
                         type = ListAlbumType.PIVIX,
-                        image = pixivNormalUrl,
-                        original = pixivOriginalUrl,
-                        width = it.width,
-                        height = it.height,
-                        count = it.pageCount
+                        image = previewUrl,
+                        original = originalUrl,
+                        width = illust.width,
+                        height = illust.height,
+                        count = illust.pageCount
                     )
                 }
             }
@@ -148,18 +143,35 @@ class ImageRepositoryImpl(
 
     override suspend fun fetchPixivPictureDetail(id: String): Result<List<ComposeGallery>> =
         runResult {
-            client.imageApi.fetchPixivIllustDetail(id).body.orEmpty().let {
-                it.map { item ->
+            val illust = client.pixivApi.getIllustDetail(illustId = id.toLong()).illust
+                ?: error("Illust not found: $id")
+
+            // 多页作品：从 metaPages 获取每页原图
+            if (illust.metaPages.isNotEmpty()) {
+                illust.metaPages.mapIndexed { index, page ->
                     ComposeGallery(
-                        id = item.id.orEmpty(),
+                        id = "${illust.id}_$index",
                         type = ListAlbumType.PIVIX,
-                        image = item.urls?.regular.orEmpty(),
-                        original = item.urls?.original.orEmpty(),
-                        width = item.width,
-                        height = item.height,
-                        count = it.size
+                        image = page.imageUrls?.large.orEmpty(),
+                        original = page.imageUrls?.original.orEmpty(),
+                        width = illust.width,
+                        height = illust.height,
+                        count = illust.metaPages.size
                     )
                 }
+            } else {
+                // 单页作品
+                listOf(
+                    ComposeGallery(
+                        id = illust.id.toString(),
+                        type = ListAlbumType.PIVIX,
+                        image = illust.previewUrl.orEmpty(),
+                        original = illust.originalUrl.orEmpty(),
+                        width = illust.width,
+                        height = illust.height,
+                        count = 1
+                    )
+                )
             }
         }
 
