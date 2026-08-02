@@ -14,6 +14,7 @@ import com.xiaoyv.bangumi.shared.core.types.MonoType
 import com.xiaoyv.bangumi.shared.core.utils.awaitAll
 import com.xiaoyv.bangumi.shared.core.utils.mutableStateFlowOf
 import com.xiaoyv.bangumi.shared.data.manager.app.PersonalStateStore
+import com.xiaoyv.bangumi.shared.data.manager.app.PreferenceStore
 import com.xiaoyv.bangumi.shared.data.model.response.bgm.ComposeMono
 import com.xiaoyv.bangumi.shared.data.repository.CacheRepository
 import com.xiaoyv.bangumi.shared.data.repository.CollectionRepository
@@ -47,6 +48,7 @@ class MonoDetailViewModel(
     private val monoRepository: MonoRepository,
     private val collectionRepository: CollectionRepository,
     private val personalStateStore: PersonalStateStore,
+    private val preferenceStore: PreferenceStore,
 ) : BaseViewModel<MonoDetailState, MonoDetailSideEffect, MonoDetailEvent.Action>(savedStateHandle) {
 
     private val cacheKey = stringPreferencesKey(name = "mono_detail_${args.type}_" + args.id)
@@ -178,7 +180,10 @@ class MonoDetailViewModel(
      * 获取搜索TAG
      */
     private fun fetchSearchImageTags(data: ComposeMono) = action {
-        pixivTag.update { data.name }
+        // 仅在有 Pixiv token 时才触发 Pixiv 搜索
+        if (preferenceStore.pixivToken.accessToken.isNotBlank()) {
+            pixivTag.update { data.name }
+        }
 
         imageRepository.fetchAnimePictureTag(data)
             .onSuccess { tags ->

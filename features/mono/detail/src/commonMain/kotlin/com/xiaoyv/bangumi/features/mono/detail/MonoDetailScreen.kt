@@ -15,8 +15,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.rounded.BookmarkAdd
 import androidx.compose.material.icons.rounded.BookmarkAdded
+import androidx.compose.material.icons.rounded.Login
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -55,6 +59,7 @@ import com.xiaoyv.bangumi.shared.core.types.ButtonType
 import com.xiaoyv.bangumi.shared.core.types.IndexCatType
 import com.xiaoyv.bangumi.shared.core.types.MonoDetailTab
 import com.xiaoyv.bangumi.shared.core.types.MonoType
+import com.xiaoyv.bangumi.shared.data.manager.app.PreferenceStore
 import com.xiaoyv.bangumi.shared.data.manager.shared.LocalSharedState
 import com.xiaoyv.bangumi.shared.data.model.request.IndexTarget
 import com.xiaoyv.bangumi.shared.data.model.response.image.ComposeGallery
@@ -83,6 +88,7 @@ import com.xiaoyv.bangumi.shared.ui.theme.BgmIcons
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.orbitmvi.orbit.compose.collectAsState
 
@@ -385,12 +391,60 @@ private fun MonoDetailScreenContent(
                 onActionEvent = onActionEvent
             )
 
-            MonoDetailTab.PIXIV -> MonoDetailPicturesScreen(
-                state = state,
-                imageItems = pixivImageItems,
-                onUiEvent = onUiEvent,
-                onActionEvent = onActionEvent
-            )
+            MonoDetailTab.PIXIV -> {
+                val preferenceStore = koinInject<PreferenceStore>()
+                val isPixivLoggedIn = preferenceStore.pixivToken.accessToken.isNotBlank()
+
+                if (isPixivLoggedIn) {
+                    MonoDetailPicturesScreen(
+                        state = state,
+                        imageItems = pixivImageItems,
+                        onUiEvent = onUiEvent,
+                        onActionEvent = onActionEvent
+                    )
+                } else {
+                    // 未登录 Pixiv 时显示登录引导
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(
+                            imageVector = BgmIcons.Login,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "需要登录 Pixiv",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "登录后可以搜索和浏览此角色的 Pixiv 插画作品",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(
+                            onClick = {
+                                onUiEvent(MonoDetailEvent.UI.OnNavScreen(Screen.PixivLogin))
+                            }
+                        ) {
+                            Icon(
+                                imageVector = BgmIcons.Login,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("去登录")
+                        }
+                    }
+                }
+            }
 
             MonoDetailTab.INDEX -> MonoDetailIndexScreen(
                 state = state,

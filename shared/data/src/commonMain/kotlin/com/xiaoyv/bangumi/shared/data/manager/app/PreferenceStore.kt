@@ -41,7 +41,7 @@ class PreferenceStore(
     /**
      * 用户登录的 Pixiv-Token 数据
      */
-    internal var pixivToken by cacheRepository.serializable(SpKey.KEY_USER_PIXIV_TOKEN, ComposePixivToken.Empty)
+    var pixivToken by cacheRepository.serializable(SpKey.KEY_USER_PIXIV_TOKEN, ComposePixivToken.Empty)
 
     /**
      * APP 设置

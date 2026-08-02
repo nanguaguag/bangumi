@@ -34,15 +34,20 @@ class PixivRepositoryImpl(
         }
     }
 
-    override suspend fun sendAuthToken(code: String, codeVerifier: String) = client.requestPixivApi {
-        sendAuthToken(
-            code = code,
-            codeVerifier = codeVerifier,
-            grantType = "authorization_code",
-            clientId = preferenceStore.settings.network.pixivClientId,
-            clientSecret = preferenceStore.settings.network.pixivClientSecret,
-            includePolicy = true,
-            redirectUri = "https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback"
-        ).let { it.copy(expiresAt = System.currentTimeMillis() + it.expiresIn * 1000) }
+    override suspend fun sendAuthToken(code: String, codeVerifier: String) = run {
+        val result = client.requestPixivApi {
+            sendAuthToken(
+                code = code,
+                codeVerifier = codeVerifier,
+                grantType = "authorization_code",
+                clientId = preferenceStore.settings.network.pixivClientId,
+                clientSecret = preferenceStore.settings.network.pixivClientSecret,
+                includePolicy = true,
+                redirectUri = "https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback"
+            ).let { it.copy(expiresAt = System.currentTimeMillis() + it.expiresIn * 1000) }
+        }
+        // 保存 token 到 PreferenceStore，供 Bearer Auth 插件使用
+        result.onSuccess { preferenceStore.pixivToken = it }
+        result
     }
 }
