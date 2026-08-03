@@ -10,6 +10,8 @@ import com.xiaoyv.bangumi.shared.native.AppDatabase
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsBytes
 import kotlinx.coroutines.Dispatchers
 import okhttp3.Dispatcher
 import okio.Path.Companion.toPath
@@ -81,5 +83,17 @@ actual object System {
 
     actual suspend fun cleanCache(): Result<Boolean> {
         return Result.success(true)
+    }
+
+    actual suspend fun downloadImage(url: String, fileName: String, subDir: String): Result<String> {
+        return kotlinx.coroutines.withContext(Dispatchers.IO) {
+            runCatching {
+                val bytes = createHttpClient {}.get(url).bodyAsBytes()
+                val dir = File(File(System.getProperty("user.home")), "Downloads/$subDir")
+                dir.mkdirs()
+                File(dir, fileName).writeBytes(bytes)
+                "Downloads/$subDir/$fileName"
+            }
+        }
     }
 }

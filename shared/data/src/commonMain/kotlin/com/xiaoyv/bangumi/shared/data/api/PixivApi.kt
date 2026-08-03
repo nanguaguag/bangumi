@@ -1,7 +1,9 @@
 package com.xiaoyv.bangumi.shared.data.api
 
 import com.xiaoyv.bangumi.shared.core.types.AppDsl
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivAddCommentResult
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivBookmarkResult
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivCommentsResult
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivFollowResult
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllustDetailResult
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllustSearchResult
@@ -143,6 +145,43 @@ interface PixivApi {
     suspend fun getIllustRelated(
         @Query("illust_id") illustId: Long,
     ): ComposePixivRelatedResult
+
+    /**
+     * 获取作品评论。
+     *
+     * @param illustId 作品 ID。
+     * @param includeReplies 是否同时返回一级回复（reply）。
+     */
+    @GET("https://app-api.pixiv.net/v3/illust/comments")
+    suspend fun getIllustComments(
+        @Query("illust_id") illustId: Long,
+        @Query("include_replies") includeReplies: Boolean = false,
+    ): ComposePixivCommentsResult
+
+    /**
+     * 获取评论的回复列表。
+     *
+     * @param commentId 评论 ID。
+     */
+    @GET("https://app-api.pixiv.net/v2/illust/comment/replies")
+    suspend fun getCommentReplies(
+        @Query("comment_id") commentId: Long,
+    ): ComposePixivCommentsResult
+
+    /**
+     * 发表评论。
+     *
+     * @param illustId 作品 ID。
+     * @param comment 评论内容，最多 140 字。
+     * @param parentCommentId 回复的评论 ID（可选）。
+     */
+    @FormUrlEncoded
+    @POST("https://app-api.pixiv.net/v1/illust/comment/add")
+    suspend fun addIllustComment(
+        @Field("illust_id") illustId: Long,
+        @Field("comment") comment: String,
+        @Field("parent_comment_id") parentCommentId: Long? = null,
+    ): ComposePixivAddCommentResult
 
     @FormUrlEncoded
     @POST("https://oauth.secure.pixiv.net/auth/token")

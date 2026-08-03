@@ -2,6 +2,8 @@ package com.xiaoyv.bangumi.features.settings.main.business
 
 import androidx.lifecycle.SavedStateHandle
 import com.xiaoyv.bangumi.core_resource.resources.Res
+import com.xiaoyv.bangumi.core_resource.resources.pixiv_download_dir_invalid
+import com.xiaoyv.bangumi.core_resource.resources.pixiv_download_dir_updated
 import com.xiaoyv.bangumi.core_resource.resources.settings_clean_cache_success
 import com.xiaoyv.bangumi.shared.System
 import com.xiaoyv.bangumi.shared.core.mvi.BaseSyntax
@@ -30,7 +32,10 @@ class SettingsMainViewModel(
         val token = preferenceStore.pixivToken
         val isLoggedIn = token.accessToken.isNotBlank()
         debugLog { "SettingsMain initSate: accessToken=${token.accessToken.take(8)}, isBlank=${token.accessToken.isBlank()}, pixivLoggedIn=$isLoggedIn" }
-        return SettingsMainState(pixivLoggedIn = isLoggedIn)
+        return SettingsMainState(
+            pixivLoggedIn = isLoggedIn,
+            pixivDownloadDir = userManager.pixivDownloadDir,
+        )
     }
 
     override fun onEvent(event: SettingsMainEvent.Action) {
@@ -38,6 +43,7 @@ class SettingsMainViewModel(
             is SettingsMainEvent.Action.OnRefresh -> refresh(event.loading)
             SettingsMainEvent.Action.OnLogout -> onLogout()
             SettingsMainEvent.Action.OnCleanCache -> onCleanCache()
+            is SettingsMainEvent.Action.OnUpdatePixivDownloadDir -> onUpdatePixivDownloadDir(event.dir)
         }
     }
 
@@ -62,6 +68,7 @@ class SettingsMainViewModel(
             state.copy(
                 pixivLoggedIn = isLoggedIn,
                 pixivUser = pixivUser,
+                pixivDownloadDir = userManager.pixivDownloadDir,
             )
         }
     }
@@ -75,5 +82,16 @@ class SettingsMainViewModel(
             .onSuccess {
                 postToast { getString(Res.string.settings_clean_cache_success) }
             }
+    }
+
+    private fun onUpdatePixivDownloadDir(dir: String) = action {
+        val newDir = dir.trim().trim('/')
+        if (newDir.isBlank()) {
+            postToast { getString(Res.string.pixiv_download_dir_invalid) }
+            return@action
+        }
+        userManager.pixivDownloadDir = newDir
+        reduceContent { state.copy(pixivDownloadDir = newDir) }
+        postToast { getString(Res.string.pixiv_download_dir_updated) }
     }
 }

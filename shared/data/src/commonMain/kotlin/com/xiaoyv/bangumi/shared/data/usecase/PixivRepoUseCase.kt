@@ -1,6 +1,7 @@
 package com.xiaoyv.bangumi.shared.data.usecase
 
 import com.xiaoyv.bangumi.shared.data.api.client.cookie.BgmCookieStorage
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivComment
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivCurrentUser
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllust
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivToken
@@ -41,6 +42,22 @@ class PixivRepoUseCase(
 
     suspend fun fetchRelatedIllusts(illustId: Long): Result<List<ComposePixivIllust>> {
         return pixivRepository.fetchRelatedIllusts(illustId)
+    }
+
+    suspend fun fetchIllustComments(illustId: Long): Result<List<ComposePixivComment>> {
+        return pixivRepository.fetchIllustComments(illustId)
+    }
+
+    suspend fun fetchCommentReplies(commentId: Long): Result<List<ComposePixivComment>> {
+        return pixivRepository.fetchCommentReplies(commentId)
+    }
+
+    suspend fun addIllustComment(
+        illustId: Long,
+        comment: String,
+        parentCommentId: Long?,
+    ): Result<ComposePixivComment?> {
+        return pixivRepository.addIllustComment(illustId, comment, parentCommentId)
     }
 
     suspend fun logout() {

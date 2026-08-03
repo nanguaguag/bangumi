@@ -1,6 +1,7 @@
 package com.xiaoyv.bangumi.shared.data.repository.impl
 
 import androidx.compose.ui.graphics.Color
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import com.xiaoyv.bangumi.shared.core.types.list.ListAlbumType
@@ -8,12 +9,14 @@ import com.xiaoyv.bangumi.shared.core.utils.parseHtmlHexColor
 import com.xiaoyv.bangumi.shared.core.utils.runResult
 import com.xiaoyv.bangumi.shared.core.utils.toApiOffset
 import com.xiaoyv.bangumi.shared.core.utils.debugLog
+import com.xiaoyv.bangumi.shared.core.utils.fromJson
 import com.xiaoyv.bangumi.shared.data.api.client.BgmApiClient
 import com.xiaoyv.bangumi.shared.data.model.request.list.album.ListAlbumParam
 import com.xiaoyv.bangumi.shared.data.model.response.bgm.ComposeMono
 import com.xiaoyv.bangumi.shared.data.model.response.image.ComposeGallery
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllust
 import com.xiaoyv.bangumi.shared.data.parser.bgm.SubjectParser
+import com.xiaoyv.bangumi.shared.data.repository.CacheRepository
 import com.xiaoyv.bangumi.shared.data.repository.ImageRepository
 import com.xiaoyv.bangumi.shared.data.repository.datasource.createNetworkPageLimitPagingPager
 import com.xiaoyv.bangumi.shared.data.repository.datasource.createPagingConfig
@@ -32,7 +35,25 @@ class ImageRepositoryImpl(
     private val client: BgmApiClient,
     private val pagingConfig: PagingConfig,
     private val subjectParser: SubjectParser,
+    private val cacheRepository: CacheRepository,
 ) : ImageRepository {
+
+    private companion object {
+        /**
+         * 屏蔽标签缓存 Key（与 GalleryViewModel 中一致），
+         * Pixiv 搜索结果中命中屏蔽标签的作品会被过滤
+         */
+        const val KEY_PIXIV_BANNED_TAGS = "pixiv_banned_tags"
+    }
+
+    /**
+     * 读取本地屏蔽标签列表（JSON ListSerializer<String>）
+     */
+    private fun readBannedTags(): Set<String> {
+        val json = cacheRepository.readSync(stringPreferencesKey(KEY_PIXIV_BANNED_TAGS), "")
+        if (json.isBlank()) return emptySet()
+        return runCatching { json.fromJson<List<String>>() }.getOrNull()?.toSet() ?: emptySet()
+    }
 
     override fun fetchAlbumPager(param: ListAlbumParam): Pager<Int, ComposeGallery> {
         return createNetworkPageLimitPagingPager(
@@ -82,27 +103,39 @@ class ImageRepositoryImpl(
             onLoadData = { page ->
                 debugLog { "Pixiv search: tag=$tag, page=$page" }
                 try {
+                    val bannedTags = readBannedTags()
                     val result = client.pixivApi.searchIllust(
                         word = tag,
                         searchTarget = "partial_match_for_tags",
                         sort = "date_desc",
                         offset = (page - 1) * 30,
                     )
-                    debugLog { "Pixiv search success: ${result.illusts.size} illusts" }
-                    result.illusts.filter { it.visible }.map { illust ->
-                        val originalUrl = illust.originalUrl.orEmpty()
-                        val previewUrl = illust.previewUrl.orEmpty()
+                    debugLog { "Pixiv search success: ${result.illusts.size} illusts, bannedTags=${bannedTags.size}" }
+                    result.illusts
+                        .filter { it.visible }
+                        // 过滤命中屏蔽标签的作品（匹配日文原 tag 或翻译名）
+                        .filter { illust ->
+                            bannedTags.isEmpty() || illust.tags.none { tagItem ->
+                                val name = tagItem.name
+                                val translated = tagItem.translatedName
+                                (name != null && name in bannedTags) ||
+                                    (translated != null && translated in bannedTags)
+                            }
+                        }
+                        .map { illust ->
+                            val originalUrl = illust.originalUrl.orEmpty()
+                            val previewUrl = illust.previewUrl.orEmpty()
 
-                        ComposeGallery(
-                            id = illust.id.toString(),
-                            type = ListAlbumType.PIVIX,
-                            image = previewUrl,
-                            original = originalUrl,
-                            width = illust.width,
-                            height = illust.height,
-                            count = illust.pageCount
-                        )
-                    }
+                            ComposeGallery(
+                                id = illust.id.toString(),
+                                type = ListAlbumType.PIVIX,
+                                image = previewUrl,
+                                original = originalUrl,
+                                width = illust.width,
+                                height = illust.height,
+                                count = illust.pageCount
+                            )
+                        }
                 } catch (e: Exception) {
                     debugLog { "Pixiv search error: ${e.message}" }
                     throw e

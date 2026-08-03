@@ -18,6 +18,8 @@ import com.xiaoyv.bangumi.shared.native.AppDatabase
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.darwin.Darwin
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsBytes
 import kotlinx.coroutines.Dispatchers
 import okio.Path.Companion.toPath
 import okio.use
@@ -129,5 +131,23 @@ actual object System {
 
     actual suspend fun cleanCache(): Result<Boolean> {
         return Result.success(true)
+    }
+
+    actual suspend fun downloadImage(url: String, fileName: String, subDir: String): Result<String> {
+        return runCatching {
+            val bytes = createHttpClient {}.get(url).bodyAsBytes()
+            val dir = fileDirectory() + "/Downloads/$subDir"
+            NSFileManager.defaultManager.createDirectoryAtPath(
+                path = dir,
+                withIntermediateDirectories = true,
+                attributes = null,
+                error = null,
+            )
+            // Buffer.write(ByteArray) 为 okio 成员函数，避免与 K/N 平台扩展冲突
+            val path = (dir + "/" + fileName).toPath()
+            val buffer = okio.Buffer().write(bytes)
+            okio.FileSystem.SYSTEM.write(path) { writeAll(buffer) }
+            "Downloads/$subDir/$fileName"
+        }
     }
 }

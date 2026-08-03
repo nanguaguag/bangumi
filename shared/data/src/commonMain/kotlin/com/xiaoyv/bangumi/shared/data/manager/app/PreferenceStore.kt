@@ -9,6 +9,7 @@ import com.xiaoyv.bangumi.shared.data.repository.CacheRepository
 import com.xiaoyv.bangumi.shared.data.repository.DatabaseRepository
 import com.xiaoyv.bangumi.shared.data.repository.boolean
 import com.xiaoyv.bangumi.shared.data.repository.serializable
+import com.xiaoyv.bangumi.shared.data.repository.string
 
 /**
  * 本地SP数据缓存，禁止UI模块直接调用，需要在 common层委托读写
@@ -47,4 +48,9 @@ class PreferenceStore(
      * APP 设置
      */
     internal var settings by cacheRepository.serializable(SpKey.KEY_SETTING, ComposeSetting.Default)
+
+    /**
+     * Pixiv 图片下载目录（Downloads 下的子目录名）
+     */
+    var pixivDownloadDir by cacheRepository.string(SpKey.KEY_PIXIV_DOWNLOAD_DIR, default = "bangumi")
 }

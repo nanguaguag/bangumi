@@ -8,6 +8,5 @@ package com.xiaoyv.bangumi.features.gallery.business
  */
 sealed class GallerySideEffect {
     data class OpenInBrowser(val url: String) : GallerySideEffect()
-    data class OpenDownload(val url: String) : GallerySideEffect()
     data class NavigateToTagSearch(val tag: String) : GallerySideEffect()
 }

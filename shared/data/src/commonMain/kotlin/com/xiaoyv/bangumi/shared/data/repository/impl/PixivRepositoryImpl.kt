@@ -9,6 +9,7 @@ import com.xiaoyv.bangumi.shared.core.utils.debugLog
 import com.xiaoyv.bangumi.shared.data.api.client.BgmApiClient
 import com.xiaoyv.bangumi.shared.data.manager.app.PreferenceStore
 import com.xiaoyv.bangumi.shared.data.model.request.ChallengeParam
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivComment
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivCurrentUser
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllust
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivMeStateResponse
@@ -166,6 +167,30 @@ class PixivRepositoryImpl(
     override suspend fun fetchRelatedIllusts(illustId: Long): Result<List<ComposePixivIllust>> {
         return client.requestPixivApi { getIllustRelated(illustId) }
             .map { it.illusts }
+    }
+
+    override suspend fun fetchIllustComments(illustId: Long): Result<List<ComposePixivComment>> {
+        return client.requestPixivApi { getIllustComments(illustId) }
+            .map { it.comments }
+    }
+
+    override suspend fun fetchCommentReplies(commentId: Long): Result<List<ComposePixivComment>> {
+        return client.requestPixivApi { getCommentReplies(commentId) }
+            .map { it.comments }
+    }
+
+    override suspend fun addIllustComment(
+        illustId: Long,
+        comment: String,
+        parentCommentId: Long?,
+    ): Result<ComposePixivComment?> {
+        return client.requestPixivApi {
+            addIllustComment(
+                illustId = illustId,
+                comment = comment,
+                parentCommentId = parentCommentId,
+            )
+        }.map { it.comment }
     }
 
     override suspend fun logout() {

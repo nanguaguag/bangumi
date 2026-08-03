@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -405,10 +406,13 @@ private fun MonoDetailScreenContent(
                     )
                 } else {
                     // 未登录 Pixiv 时显示登录引导
+                    // BgmCollapsingScaffold 将内容区整体放在 300dp 头部下方，导致内容视觉偏下。
+                    // 用负 offset 向上补偿约半个头部高度，让提示真正居中于页面（相对 AppBar 下方的可视区域）
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(32.dp),
+                            .padding(32.dp)
+                            .offset(y = (-140).dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {

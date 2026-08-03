@@ -77,7 +77,7 @@ private val repositoryModules = module {
     single<PixivRepository> { PixivRepositoryImpl(get(), get()) }
     single<TraceRepository> { TraceRepositoryImpl(get(), get()) }
     single<DatabaseRepository> { DatabaseRepositoryImpl(get()) }
-    single<ImageRepository> { ImageRepositoryImpl(get(), get(), get()) }
+    single<ImageRepository> { ImageRepositoryImpl(get(), get(), get(), get()) }
     single<CacheRepository> { CacheRepositoryImpl() }
     single<UserRepository> { UserRepositoryImpl(get(), get(), get(), get(), get()) }
     single<MikanRepository> { MikanRepositoryImpl(get(), get(), get()) }

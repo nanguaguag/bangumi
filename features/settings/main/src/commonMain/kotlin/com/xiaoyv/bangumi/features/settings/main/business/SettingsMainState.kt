@@ -14,4 +14,5 @@ data class SettingsMainState(
     val cacheSize: String = "",
     val pixivLoggedIn: Boolean = false,
     val pixivUser: ComposePixivCurrentUser? = null,
+    val pixivDownloadDir: String = "bangumi",
 )

@@ -35,6 +35,7 @@ class UserManager(
     var isUserFirstUse by preferenceStore::isUserFirstUse
     var isAgreePrivacy by preferenceStore::isAgreePrivacy
     var settings by preferenceStore::settings
+    var pixivDownloadDir by preferenceStore::pixivDownloadDir
 
     val friends = persistentListOf<ComposeFriend>()
 

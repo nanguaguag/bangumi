@@ -14,6 +14,7 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.Cached
 import androidx.compose.material.icons.rounded.DisplaySettings
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Feedback
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Info
@@ -39,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import com.xiaoyv.bangumi.core_resource.resources.Res
 import com.xiaoyv.bangumi.core_resource.resources.pixiv_account_not_login
 import com.xiaoyv.bangumi.core_resource.resources.pixiv_account_section
+import com.xiaoyv.bangumi.core_resource.resources.pixiv_download_dir_path
+import com.xiaoyv.bangumi.core_resource.resources.pixiv_download_dir_title
 import com.xiaoyv.bangumi.core_resource.resources.pixiv_manage_login
 import com.xiaoyv.bangumi.core_resource.resources.pixiv_manage_login_logged_in
 import com.xiaoyv.bangumi.core_resource.resources.settings_about
@@ -72,7 +75,9 @@ import com.xiaoyv.bangumi.shared.data.manager.shared.LocalSharedState
 import com.xiaoyv.bangumi.shared.ui.component.action.LocalActionHandler
 import com.xiaoyv.bangumi.shared.ui.component.bar.BgmLargeTopAppBar
 import com.xiaoyv.bangumi.shared.ui.component.dialog.alert.BgmAlertDialog
+import com.xiaoyv.bangumi.shared.ui.component.dialog.alert.BgmAlertInputDialog
 import com.xiaoyv.bangumi.shared.ui.component.dialog.alert.rememberAlertDialogState
+import com.xiaoyv.bangumi.shared.ui.component.dialog.alert.rememberAlertInputDialogState
 import com.xiaoyv.bangumi.shared.ui.component.layout.state.StateLayout
 import com.xiaoyv.bangumi.shared.ui.component.navigation.Screen
 import com.xiaoyv.bangumi.shared.ui.component.settings.SettingContainer
@@ -80,10 +85,13 @@ import com.xiaoyv.bangumi.shared.ui.component.settings.SettingItem
 import com.xiaoyv.bangumi.features.settings.main.component.BangumiStatusTopBarAction
 import com.xiaoyv.bangumi.shared.ui.kts.collectBaseSideEffect
 import com.xiaoyv.bangumi.shared.ui.theme.BgmIcons
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.orbitmvi.orbit.compose.collectAsState
 import kotlin.random.Random
+import androidx.compose.runtime.rememberCoroutineScope
 
 @Composable
 fun SettingsMainRoute(
@@ -158,6 +166,9 @@ private fun SettingsMainScreenContent(
     val pixivUser = state.pixivUser
     val pixivLoggedIn = state.pixivLoggedIn
 
+    val scope = rememberCoroutineScope()
+    val pixivDownloadDirDialog = rememberAlertInputDialogState()
+
     Column(modifier = Modifier.padding(vertical = 24.dp)) {
         // Bangumi 账号
         SettingContainer(label = { Text(text = stringResource(Res.string.settings_account)) }) {
@@ -194,8 +205,25 @@ private fun SettingsMainScreenContent(
                         }
                     )
                 },
-                divider = false,
                 onClick = { onUiEvent(SettingsMainEvent.UI.OnNavScreen(Screen.PixivLogin)) }
+            )
+            SettingItem(
+                title = stringResource(Res.string.pixiv_download_dir_title),
+                icon = BgmIcons.Download,
+                supportingContent = {
+                    Text(stringResource(Res.string.pixiv_download_dir_path, state.pixivDownloadDir))
+                },
+                divider = false,
+                onClick = {
+                    scope.launch {
+                        pixivDownloadDirDialog.show {
+                            it.copy(
+                                title = getString(Res.string.pixiv_download_dir_title),
+                                value = state.pixivDownloadDir,
+                            )
+                        }
+                    }
+                }
             )
         }
 
@@ -311,4 +339,11 @@ private fun SettingsMainScreenContent(
             Spacer(Modifier.height(24.dp))
         }
     }
+
+    BgmAlertInputDialog(
+        state = pixivDownloadDirDialog,
+        onConfirm = { data ->
+            onActionEvent(SettingsMainEvent.Action.OnUpdatePixivDownloadDir(data.value))
+        }
+    )
 }

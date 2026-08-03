@@ -1,6 +1,7 @@
 package com.xiaoyv.bangumi.shared.data.repository
 
 import com.xiaoyv.bangumi.shared.data.model.request.ChallengeParam
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivComment
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivCurrentUser
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllust
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivToken
@@ -47,6 +48,27 @@ interface PixivRepository {
      * 获取相关插画
      */
     suspend fun fetchRelatedIllusts(illustId: Long): Result<List<ComposePixivIllust>>
+
+    /**
+     * 获取作品评论
+     */
+    suspend fun fetchIllustComments(illustId: Long): Result<List<ComposePixivComment>>
+
+    /**
+     * 获取评论的回复列表
+     */
+    suspend fun fetchCommentReplies(commentId: Long): Result<List<ComposePixivComment>>
+
+    /**
+     * 发表评论（或回复评论）
+     *
+     * @param parentCommentId 回复目标评论 ID，为空表示发表新评论
+     */
+    suspend fun addIllustComment(
+        illustId: Long,
+        comment: String,
+        parentCommentId: Long?,
+    ): Result<ComposePixivComment?>
 
     /**
      * 退出 Pixiv 登录，清除 token

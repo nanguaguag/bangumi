@@ -816,4 +816,22 @@
     <string name="pixiv_watch_later_removed">已从稍后再看移除</string>
     <string name="pixiv_watch_later_remove">从稍后再看移除</string>
     <string name="pixiv_search_title">Pixiv 搜索：%1$s</string>
+    <string name="pixiv_download_dir">下载目录</string>
+    <string name="pixiv_comments">评论</string>
+    <string name="pixiv_comment_empty">还没有评论</string>
+    <string name="pixiv_comment_view_replies">查看回复</string>
+    <string name="pixiv_comment_reply_to">回复 @%1$s</string>
+    <string name="pixiv_comment_reply_to_illust">回复插画</string>
+    <string name="pixiv_related_illusts">相关图片</string>
+    <string name="pixiv_tag_ban">屏蔽标签</string>
+    <string name="pixiv_tag_bookmark">收藏标签</string>
+    <string name="pixiv_tag_copy">复制标签</string>
+    <string name="pixiv_cancel">取消</string>
+    <string name="pixiv_download_dir_title">更改下载目录</string>
+    <string name="pixiv_download_dir_hint">输入 Downloads 下的子目录名</string>
+    <string name="pixiv_download_dir_path">Downloads/%1$s</string>
+    <string name="pixiv_download_dir_updated">下载目录已更新</string>
+    <string name="pixiv_download_dir_invalid">下载目录不能为空</string>
+    <string name="pixiv_download_success">已保存到 Downloads/%1$s</string>
+    <string name="pixiv_download_fail">下载失败：%1$s</string>
 </resources>

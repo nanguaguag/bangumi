@@ -2,6 +2,7 @@ package com.xiaoyv.bangumi.features.gallery.business
 
 import androidx.compose.runtime.Immutable
 import com.xiaoyv.bangumi.shared.data.model.response.image.ComposeGallery
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivComment
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllust
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivUserDetail
 import kotlinx.serialization.SerialName
@@ -25,4 +26,19 @@ data class GalleryState(
     @SerialName("isFollowed") val isFollowed: Boolean = false,
     @SerialName("isWatchLater") val isWatchLater: Boolean = false,
     @SerialName("isLoadingAction") val isLoadingAction: Boolean = false,
+
+    // ---- 评论 ----
+    @SerialName("comments") val comments: List<ComposePixivComment> = emptyList(),
+    @SerialName("commentsLoading") val commentsLoading: Boolean = false,
+    @SerialName("expandedReplyIds") val expandedReplyIds: Set<Long> = emptySet(),
+    @SerialName("commentInput") val commentInput: String = "",
+    @SerialName("replyTarget") val replyTarget: ComposePixivComment? = null,
+
+    // ---- 相关图片 ----
+    @SerialName("relatedIllusts") val relatedIllusts: List<ComposePixivIllust> = emptyList(),
+    @SerialName("relatedLoading") val relatedLoading: Boolean = false,
+
+    // ---- 标签 ----
+    @SerialName("bannedTags") val bannedTags: List<String> = emptyList(),
+    @SerialName("bookmarkedTags") val bookmarkedTags: List<String> = emptyList(),
 )

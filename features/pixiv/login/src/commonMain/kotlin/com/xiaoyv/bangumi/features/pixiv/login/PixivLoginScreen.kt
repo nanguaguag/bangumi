@@ -56,7 +56,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -551,7 +550,7 @@ private fun PixivLoggedInContent(
 }
 
 /**
- * 用户信息头部卡片 — 渐变背景 + 大头像
+ * 用户信息头部卡片 — 纯色背景 + 大头像
  */
 @Composable
 private fun ProfileHeaderCard(state: PixivLoginState) {
@@ -562,14 +561,7 @@ private fun ProfileHeaderCard(state: PixivLoginState) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer,
-                            MaterialTheme.colorScheme.surfaceVariant,
-                        )
-                    )
-                )
+                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(20.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {

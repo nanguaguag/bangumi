@@ -31,4 +31,14 @@ expect object System {
     fun shareText(text: String)
 
     fun createHttpClient(block: HttpClientConfig<*>.() -> Unit): HttpClient
+
+    /**
+     * 下载图片到公共下载目录的子目录（Android: Download/{subDir}）
+     *
+     * @param url 完整下载地址（调用方需自行处理防盗链/代理重写）
+     * @param fileName 文件名（含扩展名）
+     * @param subDir 下载目录子目录名（如 "bangumi"）
+     * @return 成功时返回保存的相对路径（如 "Download/bangumi/123.jpg"）
+     */
+    suspend fun downloadImage(url: String, fileName: String, subDir: String): Result<String>
 }
