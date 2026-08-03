@@ -23,5 +23,6 @@ data class GalleryState(
     @SerialName("showOriginal") val showOriginal: Boolean = false,
     @SerialName("isBookmarked") val isBookmarked: Boolean = false,
     @SerialName("isFollowed") val isFollowed: Boolean = false,
+    @SerialName("isWatchLater") val isWatchLater: Boolean = false,
     @SerialName("isLoadingAction") val isLoadingAction: Boolean = false,
 )

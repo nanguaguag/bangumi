@@ -49,6 +49,7 @@ class PixivLoginViewModel(
                             loginSuccess = false,
                         )
                     }
+                    loadUserProfile(user.id)
                 }
                 .onFailure {
                     debugLog { "PixivLogin refreshSync: fetchCurrentUser FAILED=${it.message}" }
@@ -56,8 +57,22 @@ class PixivLoginViewModel(
                 }
         } else {
             debugLog { "PixivLogin refreshSync: not logged in" }
-            reduceContent { state.copy(isLoggedIn = false, currentUser = null) }
+            reduceContent { state.copy(isLoggedIn = false, currentUser = null, userProfile = null) }
         }
+    }
+
+    /**
+     * 加载用户详细资料（生日、职业、地区、国家、主页、社交链接等）
+     */
+    private suspend fun BaseSyntax<PixivLoginState, PixivLoginSideEffect>.loadUserProfile(userId: Long) {
+        pixivRepoUseCase.fetchUserDetail(userId)
+            .onSuccess { detail ->
+                debugLog { "PixivLogin loadUserProfile: birth=${detail.profile?.birth}, region=${detail.profile?.region}" }
+                reduceContent { state.copy(userProfile = detail.profile) }
+            }
+            .onFailure {
+                debugLog { "PixivLogin loadUserProfile FAILED=${it.message}" }
+            }
     }
 
     override fun onEvent(event: PixivLoginEvent.Action) {
@@ -121,6 +136,7 @@ class PixivLoginViewModel(
                             tokenInput = "",
                         )
                     }
+                    loadUserProfile(user.id)
                     kotlinx.coroutines.delay(3000)
                     reduceContent { state.copy(loginSuccess = false) }
                 }

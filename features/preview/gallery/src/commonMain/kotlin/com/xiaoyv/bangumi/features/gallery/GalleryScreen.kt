@@ -80,6 +80,7 @@ import com.xiaoyv.bangumi.core_resource.resources.pixiv_related
 import com.xiaoyv.bangumi.core_resource.resources.pixiv_show_original
 import com.xiaoyv.bangumi.core_resource.resources.pixiv_unfollow
 import com.xiaoyv.bangumi.core_resource.resources.pixiv_watch_later
+import com.xiaoyv.bangumi.core_resource.resources.pixiv_watch_later_remove
 import com.xiaoyv.bangumi.features.gallery.business.GalleryEvent
 import com.xiaoyv.bangumi.features.gallery.business.GallerySideEffect
 import com.xiaoyv.bangumi.features.gallery.business.GalleryState
@@ -118,7 +119,7 @@ fun GalleryRoute(
                 uriHandler.openUri(it.url)
             }
             is GallerySideEffect.NavigateToTagSearch -> {
-                onNavScreen(Screen.SearchResult(it.tag))
+                onNavScreen(Screen.PixivSearch(it.tag))
             }
         }
     }
@@ -154,7 +155,7 @@ private fun GalleryScreen(
                 onNavigationClick = { onUiEvent(GalleryEvent.UI.OnNavUp) },
                 actions = {
                     // 菜单按钮
-                    GalleryTopBarMenu(onActionEvent)
+                    GalleryTopBarMenu(state = baseState.payload ?: GalleryState(), onActionEvent)
                 }
             )
         }
@@ -177,10 +178,10 @@ private fun GalleryScreen(
 
 @Composable
 private fun GalleryTopBarMenu(
+    state: GalleryState,
     onActionEvent: (GalleryEvent.Action) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val uriHandler = LocalUriHandler.current
 
     Box {
         IconButton(onClick = { expanded = true }) {
@@ -201,13 +202,28 @@ private fun GalleryTopBarMenu(
                     onActionEvent(GalleryEvent.Action.OnOpenInBrowser)
                 }
             )
-            DropdownMenuItem(
-                text = { Text(stringResource(Res.string.pixiv_watch_later)) },
-                leadingIcon = { Icon(BgmIcons.BookmarkBorder, null) },
-                onClick = {
-                    expanded = false
-                }
-            )
+            if (state.isPixiv) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            stringResource(
+                                if (state.isWatchLater) Res.string.pixiv_watch_later_remove
+                                else Res.string.pixiv_watch_later
+                            )
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            if (state.isWatchLater) BgmIcons.Bookmark else BgmIcons.BookmarkBorder,
+                            null
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onActionEvent(GalleryEvent.Action.OnToggleWatchLater)
+                    }
+                )
+            }
             DropdownMenuItem(
                 text = { Text(stringResource(Res.string.global_copy_link)) },
                 leadingIcon = { Icon(BgmIcons.ContentCopy, null) },
@@ -216,14 +232,29 @@ private fun GalleryTopBarMenu(
                     onActionEvent(GalleryEvent.Action.OnCopyLink)
                 }
             )
-            DropdownMenuItem(
-                text = { Text(stringResource(Res.string.pixiv_show_original)) },
-                leadingIcon = { Icon(BgmIcons.Visibility, null) },
-                onClick = {
-                    expanded = false
-                    onActionEvent(GalleryEvent.Action.OnToggleShowOriginal)
-                }
-            )
+            if (state.isPixiv) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            stringResource(Res.string.pixiv_show_original),
+                            color = if (state.showOriginal) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurface,
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            BgmIcons.Visibility,
+                            null,
+                            tint = if (state.showOriginal) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onActionEvent(GalleryEvent.Action.OnToggleShowOriginal)
+                    }
+                )
+            }
             DropdownMenuItem(
                 text = { Text(stringResource(Res.string.global_share)) },
                 leadingIcon = { Icon(BgmIcons.Share, null) },
@@ -255,8 +286,18 @@ private fun PixivGalleryContent(
                     .fillMaxWidth()
                     .aspectRatio(item.aspect),
                 item = item,
+                showOriginal = state.showOriginal,
                 onClick = {
-                    onUiEvent(GalleryEvent.UI.OnNavScreen(Screen.PreviewMain(index, state.images.map { it.image })))
+                    onUiEvent(
+                        GalleryEvent.UI.OnNavScreen(
+                            Screen.PreviewMain(
+                                index,
+                                state.images.map {
+                                    if (state.showOriginal && it.original.isNotBlank()) it.original else it.image
+                                }
+                            )
+                        )
+                    )
                 }
             )
         }
@@ -612,8 +653,18 @@ private fun GalleryImageGrid(
                     .fillMaxWidth()
                     .aspectRatio(item.aspect),
                 item = item,
+                showOriginal = state.showOriginal,
                 onClick = {
-                    onUiEvent(GalleryEvent.UI.OnNavScreen(Screen.PreviewMain(index, state.images.map { it.image })))
+                    onUiEvent(
+                        GalleryEvent.UI.OnNavScreen(
+                            Screen.PreviewMain(
+                                index,
+                                state.images.map {
+                                    if (state.showOriginal && it.original.isNotBlank()) it.original else it.image
+                                }
+                            )
+                        )
+                    )
                 }
             )
         }
@@ -625,6 +676,7 @@ private fun GalleryImageGrid(
 private fun GalleryPictureItem(
     modifier: Modifier,
     item: ComposeGallery,
+    showOriginal: Boolean = false,
     onClick: () -> Unit,
 ) {
     Box(modifier = Modifier.clickable(onClick = onClick).then(modifier)) {
@@ -632,7 +684,7 @@ private fun GalleryPictureItem(
             modifier = Modifier
                 .matchParentSize()
                 .background(item.uiColor),
-            model = item.image
+            model = if (showOriginal && item.original.isNotBlank()) item.original else item.image
         )
 
         Text(

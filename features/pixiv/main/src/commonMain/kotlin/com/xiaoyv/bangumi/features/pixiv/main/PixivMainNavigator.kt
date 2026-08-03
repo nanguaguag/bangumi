@@ -17,5 +17,12 @@ val pixivMainModule = module {
                 onNavUp = { navigator.goBack() }
             )
         }
+        navigation<Screen.PixivSearch> { key ->
+            PixivSearchRoute(
+                viewModel = koinViewModel { parametersOf(key) },
+                onNavScreen = { navigator.navigate(it) },
+                onNavUp = { navigator.goBack() }
+            )
+        }
     }
 }

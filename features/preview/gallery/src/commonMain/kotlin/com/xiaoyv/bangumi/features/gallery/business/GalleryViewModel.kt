@@ -2,18 +2,26 @@ package com.xiaoyv.bangumi.features.gallery.business
 
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.SavedStateHandle
+import com.xiaoyv.bangumi.core_resource.resources.Res
+import com.xiaoyv.bangumi.core_resource.resources.pixiv_watch_later_added
+import com.xiaoyv.bangumi.core_resource.resources.pixiv_watch_later_removed
 import com.xiaoyv.bangumi.shared.System
 import com.xiaoyv.bangumi.shared.core.mvi.BaseSyntax
 import com.xiaoyv.bangumi.shared.core.mvi.BaseViewModel
 import com.xiaoyv.bangumi.shared.core.types.list.ListAlbumType
 import com.xiaoyv.bangumi.shared.core.utils.debugLog
+import com.xiaoyv.bangumi.shared.core.utils.defaultJson
 import com.xiaoyv.bangumi.shared.core.utils.errMsg
+import com.xiaoyv.bangumi.shared.core.utils.fromJson
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivWatchLaterItem
 import com.xiaoyv.bangumi.shared.data.repository.CacheRepository
 import com.xiaoyv.bangumi.shared.data.repository.readViewModelCache
 import com.xiaoyv.bangumi.shared.data.repository.writeViewModelCache
 import com.xiaoyv.bangumi.shared.data.usecase.ImageRepoUseCase
 import com.xiaoyv.bangumi.shared.data.usecase.PixivRepoUseCase
 import com.xiaoyv.bangumi.shared.ui.component.navigation.Screen
+import kotlinx.serialization.builtins.ListSerializer
+import org.jetbrains.compose.resources.getString
 
 /**
  * [GalleryViewModel]
@@ -31,6 +39,18 @@ class GalleryViewModel(
 
     private val cacheKey = stringPreferencesKey(name = "gallery_${args.type}_" + args.id)
 
+    /**
+     * Pixiv 稍后再看列表缓存 Key（本地存储，与 [ComposePixivWatchLaterItem] 序列化列表）
+     */
+    private val watchLaterCacheKey = stringPreferencesKey(name = "pixiv_watch_later")
+
+    private fun readWatchLaterList(): List<ComposePixivWatchLaterItem> {
+        val json = cacheRepository.readSync(watchLaterCacheKey, "")
+        return if (json.isBlank()) emptyList() else runCatching {
+            json.fromJson<List<ComposePixivWatchLaterItem>>()
+        }.getOrNull() ?: emptyList()
+    }
+
     override fun initBaseState() = readViewModelCache(
         cacheRepository = cacheRepository,
         cacheKey = cacheKey,
@@ -40,6 +60,7 @@ class GalleryViewModel(
     override fun initSate(onCreate: Boolean) = GalleryState(
         id = args.id,
         isPixiv = args.type == ListAlbumType.PIVIX,
+        isWatchLater = readWatchLaterList().any { it.id == args.id },
     )
 
     override suspend fun BaseSyntax<GalleryState, GallerySideEffect>.refreshSync() {
@@ -80,6 +101,7 @@ class GalleryViewModel(
             is GalleryEvent.Action.OnToggleBookmark -> onToggleBookmark()
             is GalleryEvent.Action.OnToggleFollow -> onToggleFollow()
             is GalleryEvent.Action.OnToggleShowOriginal -> onToggleShowOriginal()
+            is GalleryEvent.Action.OnToggleWatchLater -> onToggleWatchLater()
             is GalleryEvent.Action.OnShare -> onShare()
             is GalleryEvent.Action.OnCopyLink -> onCopyLink()
             is GalleryEvent.Action.OnTagClick -> onTagClick(event.tag)
@@ -130,6 +152,36 @@ class GalleryViewModel(
 
     private fun onToggleShowOriginal() = action {
         reduceContent { state.copy(showOriginal = !state.showOriginal) }
+    }
+
+    private fun onToggleWatchLater() = action {
+        val currentState = stateRaw
+        val illust = currentState.illust ?: return@action
+        val newWatchLater = !currentState.isWatchLater
+
+        val currentList = readWatchLaterList()
+        val newList = if (newWatchLater) {
+            // 移除同 ID 旧条目后追加，保证最新在前
+            currentList.filterNot { it.id == currentState.id } + ComposePixivWatchLaterItem(
+                id = currentState.id,
+                title = illust.title.orEmpty(),
+                thumb = illust.imageUrls?.medium.orEmpty(),
+                author = illust.user?.name.orEmpty(),
+                authorId = illust.user?.id ?: 0,
+                time = System.currentTimeMillis(),
+            )
+        } else {
+            currentList.filterNot { it.id == currentState.id }
+        }
+
+        cacheRepository.write(
+            watchLaterCacheKey,
+            defaultJson.encodeToString(ListSerializer(ComposePixivWatchLaterItem.serializer()), newList)
+        )
+        reduceContent { state.copy(isWatchLater = newWatchLater) }
+        postToast {
+            getString(if (newWatchLater) Res.string.pixiv_watch_later_added else Res.string.pixiv_watch_later_removed)
+        }
     }
 
     private fun onShare() = action {

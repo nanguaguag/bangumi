@@ -20,6 +20,7 @@ sealed class GalleryEvent {
         data object OnToggleBookmark : Action()
         data object OnToggleFollow : Action()
         data object OnToggleShowOriginal : Action()
+        data object OnToggleWatchLater : Action()
         data object OnShare : Action()
         data object OnCopyLink : Action()
         data object OnDownload : Action()

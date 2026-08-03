@@ -48,6 +48,16 @@ data class ComposePixivUserProfile(
     val region: String? = null,
     @SerialName("job")
     val job: String? = null,
+    @SerialName("country_code")
+    val country: String? = null,
+    @SerialName("twitter_account")
+    val twitterAccount: String? = null,
+    @SerialName("twitter_url")
+    val twitterUrl: String? = null,
+    @SerialName("pawoo_url")
+    val pawooUrl: String? = null,
+    @SerialName("is_premium")
+    val isPremium: Boolean = false,
 )
 
 /**
