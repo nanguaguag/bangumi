@@ -1,9 +1,14 @@
 package com.xiaoyv.bangumi.shared.data.api
 
 import com.xiaoyv.bangumi.shared.core.types.AppDsl
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivBookmarkResult
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivFollowResult
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllustDetailResult
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllustSearchResult
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivMeStateResponse
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivRelatedResult
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivToken
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivUserDetailResult
 import de.jensklingenberg.ktorfit.http.Field
 import de.jensklingenberg.ktorfit.http.FormUrlEncoded
 import de.jensklingenberg.ktorfit.http.GET
@@ -62,6 +67,82 @@ interface PixivApi {
     suspend fun getIllustDetail(
         @Query("illust_id") illustId: Long,
     ): ComposePixivIllustDetailResult
+
+    /**
+     * 获取当前登录用户简要信息。
+     *
+     * /v1/user/me 已被 Pixiv 废弃（返回 404），改用 /v1/user/me/state。
+     */
+    @GET("v1/user/me/state")
+    suspend fun getCurrentUser(): ComposePixivMeStateResponse
+
+    /**
+     * 获取用户详情。
+     *
+     * @param userId 用户 ID。
+     */
+    @GET("v1/user/detail")
+    suspend fun getUserDetail(
+        @Query("user_id") userId: Long,
+    ): ComposePixivUserDetailResult
+
+    /**
+     * 收藏插画。
+     *
+     * @param illustId 作品 ID。
+     * @param restrict 公开范围: public / private。
+     */
+    @FormUrlEncoded
+    @POST("https://app-api.pixiv.net/v2/illust/bookmark/add")
+    suspend fun bookmarkIllustAdd(
+        @Field("illust_id") illustId: Long,
+        @Field("restrict") restrict: String = "public",
+    ): ComposePixivBookmarkResult
+
+    /**
+     * 取消收藏插画。
+     *
+     * @param illustId 作品 ID。
+     */
+    @FormUrlEncoded
+    @POST("https://app-api.pixiv.net/v1/illust/bookmark/delete")
+    suspend fun bookmarkIllustDelete(
+        @Field("illust_id") illustId: Long,
+    ): ComposePixivBookmarkResult
+
+    /**
+     * 关注用户。
+     *
+     * @param userId 用户 ID。
+     * @param restrict 关注类型: public / private。
+     */
+    @FormUrlEncoded
+    @POST("https://app-api.pixiv.net/v1/user/follow/add")
+    suspend fun followUserAdd(
+        @Field("user_id") userId: Long,
+        @Field("restrict") restrict: String = "public",
+    ): ComposePixivFollowResult
+
+    /**
+     * 取消关注用户。
+     *
+     * @param userId 用户 ID。
+     */
+    @FormUrlEncoded
+    @POST("https://app-api.pixiv.net/v1/user/follow/delete")
+    suspend fun followUserDelete(
+        @Field("user_id") userId: Long,
+    ): ComposePixivFollowResult
+
+    /**
+     * 获取相关插画。
+     *
+     * @param illustId 作品 ID。
+     */
+    @GET("https://app-api.pixiv.net/v2/illust/related")
+    suspend fun getIllustRelated(
+        @Query("illust_id") illustId: Long,
+    ): ComposePixivRelatedResult
 
     @FormUrlEncoded
     @POST("https://oauth.secure.pixiv.net/auth/token")

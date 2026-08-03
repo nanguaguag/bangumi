@@ -1,6 +1,7 @@
 package com.xiaoyv.bangumi.features.settings.main.business
 
 import androidx.compose.runtime.Immutable
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivCurrentUser
 
 /**
  * [SettingsMainState]
@@ -11,4 +12,6 @@ import androidx.compose.runtime.Immutable
 @Immutable
 data class SettingsMainState(
     val cacheSize: String = "",
+    val pixivLoggedIn: Boolean = false,
+    val pixivUser: ComposePixivCurrentUser? = null,
 )

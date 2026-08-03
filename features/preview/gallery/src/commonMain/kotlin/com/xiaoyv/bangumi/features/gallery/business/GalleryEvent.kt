@@ -16,5 +16,13 @@ sealed class GalleryEvent {
 
     sealed class Action : GalleryEvent() {
         data class OnRefresh(val loading: Boolean) : Action()
+        data object OnOpenInBrowser : Action()
+        data object OnToggleBookmark : Action()
+        data object OnToggleFollow : Action()
+        data object OnToggleShowOriginal : Action()
+        data object OnShare : Action()
+        data object OnCopyLink : Action()
+        data object OnDownload : Action()
+        data class OnTagClick(val tag: String) : Action()
     }
 }

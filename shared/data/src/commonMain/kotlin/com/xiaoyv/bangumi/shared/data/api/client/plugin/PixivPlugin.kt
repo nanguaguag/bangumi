@@ -31,8 +31,19 @@ val PixivProxyPlugin: ClientPlugin<PixivImagePluginConfig> =
         onRequest { request, _ ->
             val url = request.url.toString()
 
-            // 授权登录添加请求头
-            if (url.contains("oauth.secure.pixiv.net")) {
+            // Pixiv API 请求头：所有 pixiv.net API 域名都需要这些头（oauth.secure.pixiv.net / app-api.pixiv.net）
+            // 排除 pximg.net 等图片 CDN 域名
+            if (url.contains("pixiv.net") && !url.contains("pximg.net")) {
+                // 清除 bgm.tv 专用头，这些会导致 Pixiv 返回 invalid_request
+                request.headers.remove("Cookie")
+                request.headers.remove("TE")
+                request.headers.remove("Pragma")
+                request.headers.remove("Cache-Control")
+                // 移除 GET 请求上不必要的 Content-Type（Pixiv 对此严格）
+                if (request.method.value == "GET") {
+                    request.headers.remove("Content-Type")
+                }
+
                 val formatted = kotlin.time.Clock.System.now().toString()
                 val hashTime = Algorithm.MD5
                     .hash((formatted + config.network.pixivTimeHashSecret).encodeToByteArray())

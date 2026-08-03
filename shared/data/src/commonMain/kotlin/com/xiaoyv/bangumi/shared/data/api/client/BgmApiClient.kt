@@ -4,10 +4,11 @@ package com.xiaoyv.bangumi.shared.data.api.client
 
 import com.fleeksoft.ksoup.Ksoup
 import com.xiaoyv.bangumi.shared.core.types.AppDsl
+import com.xiaoyv.bangumi.shared.System
 import com.xiaoyv.bangumi.shared.core.utils.debugLog
+import com.xiaoyv.bangumi.shared.core.utils.defaultJson
 import com.xiaoyv.bangumi.shared.core.utils.requireNoError
 import com.xiaoyv.bangumi.shared.core.utils.runResult
-import com.xiaoyv.bangumi.shared.core.utils.uppercaseFirstChar
 import com.xiaoyv.bangumi.shared.data.api.BgmJsonApi
 import com.xiaoyv.bangumi.shared.data.api.BgmWebApi
 import com.xiaoyv.bangumi.shared.data.api.DouBanApi
@@ -20,7 +21,7 @@ import com.xiaoyv.bangumi.shared.data.api.client.converter.HttpCodeConverterFact
 import com.xiaoyv.bangumi.shared.data.api.client.converter.HttpDocumentConverterFactory
 import com.xiaoyv.bangumi.shared.data.api.client.cookie.BgmCookieStorage
 import com.xiaoyv.bangumi.shared.data.api.client.plugin.DouBanPlugin
-import com.xiaoyv.bangumi.shared.data.api.client.plugin.PixivProxyPlugin
+import com.xiaoyv.bangumi.shared.data.api.client.plugin.PixivAuthPlugin
 import com.xiaoyv.bangumi.shared.data.api.createBgmJsonApi
 import com.xiaoyv.bangumi.shared.data.api.createBgmWebApi
 import com.xiaoyv.bangumi.shared.data.api.createDouBanApi
@@ -58,18 +59,26 @@ import com.xiaoyv.bangumi.shared.data.api.next.createUserApi
 import com.xiaoyv.bangumi.shared.data.constant.WebConstant
 import com.xiaoyv.bangumi.shared.data.manager.app.PreferenceStore
 import com.xiaoyv.bangumi.shared.data.model.response.bgm.ComposeAuthToken
+import com.xiaoyv.bangumi.shared.data.model.response.bgm.ComposeSetting
 import com.xiaoyv.bangumi.shared.data.model.response.bgm.user.ComposeUser
-import com.xiaoyv.bangumi.shared.systemDevice
 import de.jensklingenberg.ktorfit.ktorfit
+import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.auth.Auth
 import io.ktor.client.plugins.auth.providers.BearerTokens
 import io.ktor.client.plugins.auth.providers.bearer
+import io.ktor.client.plugins.compression.ContentEncoding
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.plugins.logging.LoggingFormat
+import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
@@ -159,7 +168,7 @@ class BgmApiClient(
     }
 
     val pixivApiRetrofit = ktorfit {
-        httpClient(createHttpClient(config) { installPixivAuth() })
+        httpClient(createPixivHttpClient(config, preferenceStore))
         baseUrl(WebConstant.URL_BASE_API_PIXIV)
         converterFactories(HttpCodeConverterFactory())
     }
@@ -251,54 +260,65 @@ class BgmApiClient(
     }
 
     /**
-     * Pixiv Api 自动授权
+     * Pixiv Api — 干净的 HTTP Client
+     *
+     * 参考 pixko 实现：仅发送 Authorization + Accept-Language + Referer 三个头，
+     * 不继承 bgm.tv 的默认请求头（Content-Type / Pragma / Cache-Control / TE / Cookie / User-Agent 等），
+     * 否则 Pixiv API 返回 HTTP 400 "invalid_request"。
      */
-    private fun HttpClientConfig<*>.installPixivAuth() {
-        install(PixivProxyPlugin) {
-            network = config
-            os = systemDevice.os
-            userAgent = buildString {
-                append("PixivAndroidApp/${config.pixivVersion} (")
-                append(systemDevice.os.uppercaseFirstChar())
-                append(" ")
-                append(systemDevice.systemVersion)
-                append("; ")
-                append(systemDevice.deviceModel)
-                append(")")
+    private fun createPixivHttpClient(
+        config: ComposeSetting.NetworkConfig,
+        preferenceStore: PreferenceStore,
+    ): HttpClient {
+        debugLog { "PixivHttpClient: creating CLEAN client (no bgm.tv headers, no x-client-* headers)" }
+        return System.createHttpClient {
+            install(HttpTimeout) {
+                connectTimeoutMillis = config.connectTimeoutMillis
+                socketTimeoutMillis = config.socketTimeoutMillis
+                requestTimeoutMillis = config.connectTimeoutMillis + config.socketTimeoutMillis + 5_000
             }
-        }
 
-        defaultRequest {
-            header(HttpHeaders.Referrer, "https://app-api.pixiv.net/")
-        }
+            install(ContentNegotiation) {
+                json(defaultJson)
+            }
 
-        install(Auth) {
-            // Pixiv 自动授权
-            bearer {
-                sendWithoutRequest { request ->
-                    request.url.host.contains("app-api.pixiv.net")
+            install(ContentEncoding) {
+                deflate(1f)
+                gzip(0.9f)
+            }
+
+            install(Logging) {
+                format = LoggingFormat.Default
+                level = LogLevel.ALL
+                logger = object : Logger {
+                    override fun log(message: String) {
+                        debugLog { "PixivHTTP: $message" }
+                    }
                 }
+            }
 
-                loadTokens {
-                    val token = preferenceStore.pixivToken
-                    if (token.accessToken.isBlank() || token.refreshToken.isBlank()) null else BearerTokens(
-                        accessToken = token.accessToken,
-                        refreshToken = token.refreshToken
-                    )
-                }
+            // 参考 pixko：仅发送 Accept-Language 和 Referer
+            defaultRequest {
+                header(HttpHeaders.AcceptLanguage, "zh-CN")
+                header(HttpHeaders.Referrer, "https://app-api.pixiv.net/")
+            }
 
-                refreshTokens {
-                    val refreshToken = oldTokens?.refreshToken.orEmpty()
+            // Pixiv Bearer 自动授权 / 刷新
+            // 注意：Pixiv 对过期 access_token 返回 HTTP 400（而非 401），内置 Auth 插件不触发刷新，
+            // 因此使用自定义 PixivAuthPlugin（参考 pixko TokenAutoRefreshPluginV2）：
+            // 过期预检 + 400 OAuth 错误自动刷新并重试。
+            install(PixivAuthPlugin) {
+                this.preferenceStore = preferenceStore
+                refreshBlock = { expiredToken ->
+                    val refreshToken = expiredToken.refreshToken
                     if (refreshToken.isBlank()) null else {
-                        val newToken = pixivApi.sendAuthTokenRefresh(
+                        pixivApi.sendAuthTokenRefresh(
                             grantType = "refresh_token",
                             clientId = config.pixivClientId,
                             clientSecret = config.pixivClientSecret,
                             includePolicy = true,
                             refreshToken = refreshToken
-                        )
-                        preferenceStore.pixivToken = newToken
-                        BearerTokens(newToken.accessToken, newToken.refreshToken)
+                        ).takeIf { it.accessToken.isNotBlank() }
                     }
                 }
             }

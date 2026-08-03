@@ -7,10 +7,12 @@ import com.xiaoyv.bangumi.shared.core.types.list.ListAlbumType
 import com.xiaoyv.bangumi.shared.core.utils.parseHtmlHexColor
 import com.xiaoyv.bangumi.shared.core.utils.runResult
 import com.xiaoyv.bangumi.shared.core.utils.toApiOffset
+import com.xiaoyv.bangumi.shared.core.utils.debugLog
 import com.xiaoyv.bangumi.shared.data.api.client.BgmApiClient
 import com.xiaoyv.bangumi.shared.data.model.request.list.album.ListAlbumParam
 import com.xiaoyv.bangumi.shared.data.model.response.bgm.ComposeMono
 import com.xiaoyv.bangumi.shared.data.model.response.image.ComposeGallery
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllust
 import com.xiaoyv.bangumi.shared.data.parser.bgm.SubjectParser
 import com.xiaoyv.bangumi.shared.data.repository.ImageRepository
 import com.xiaoyv.bangumi.shared.data.repository.datasource.createNetworkPageLimitPagingPager
@@ -78,25 +80,32 @@ class ImageRepositoryImpl(
             pagingConfig = createPagingConfig(30),
             keySelector = { it.id },
             onLoadData = { page ->
-                val result = client.pixivApi.searchIllust(
-                    word = tag,
-                    searchTarget = "partial_match_for_tags",
-                    sort = "date_desc",
-                    offset = (page - 1) * 30,
-                )
-                result.illusts.filter { it.visible }.map { illust ->
-                    val originalUrl = illust.originalUrl.orEmpty()
-                    val previewUrl = illust.previewUrl.orEmpty()
-
-                    ComposeGallery(
-                        id = illust.id.toString(),
-                        type = ListAlbumType.PIVIX,
-                        image = previewUrl,
-                        original = originalUrl,
-                        width = illust.width,
-                        height = illust.height,
-                        count = illust.pageCount
+                debugLog { "Pixiv search: tag=$tag, page=$page" }
+                try {
+                    val result = client.pixivApi.searchIllust(
+                        word = tag,
+                        searchTarget = "partial_match_for_tags",
+                        sort = "date_desc",
+                        offset = (page - 1) * 30,
                     )
+                    debugLog { "Pixiv search success: ${result.illusts.size} illusts" }
+                    result.illusts.filter { it.visible }.map { illust ->
+                        val originalUrl = illust.originalUrl.orEmpty()
+                        val previewUrl = illust.previewUrl.orEmpty()
+
+                        ComposeGallery(
+                            id = illust.id.toString(),
+                            type = ListAlbumType.PIVIX,
+                            image = previewUrl,
+                            original = originalUrl,
+                            width = illust.width,
+                            height = illust.height,
+                            count = illust.pageCount
+                        )
+                    }
+                } catch (e: Exception) {
+                    debugLog { "Pixiv search error: ${e.message}" }
+                    throw e
                 }
             }
         )
@@ -173,6 +182,13 @@ class ImageRepositoryImpl(
                     )
                 )
             }
+        }
+
+    override suspend fun fetchPixivIllust(id: String): Result<ComposePixivIllust> =
+        runResult {
+            val illust = client.pixivApi.getIllustDetail(illustId = id.toLong()).illust
+                ?: error("Illust not found: $id")
+            illust
         }
 
     override suspend fun fetchAnimePictureTag(data: ComposeMono): Result<List<String>> =

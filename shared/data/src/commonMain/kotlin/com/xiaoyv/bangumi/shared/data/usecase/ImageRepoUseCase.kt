@@ -73,4 +73,10 @@ class ImageRepoUseCase(
             else -> Result.success(emptyList())
         }
     }
+
+    suspend fun fetchPixivIllustDetail(
+        id: String,
+    ): Result<com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllust> {
+        return imageRepository.fetchPixivIllust(id)
+    }
 }

@@ -133,4 +133,17 @@ data class ComposePixivUser(
     val name: String? = null,
     @SerialName("account")
     val account: String? = null,
+    @SerialName("profile_image_urls")
+    val profileImageUrls: ComposePixivProfileImageUrls? = null,
+    @SerialName("comment")
+    val comment: String? = null,
+    @SerialName("is_followed")
+    val isFollowed: Boolean = false,
+)
+
+@Serializable
+@Immutable
+data class ComposePixivProfileImageUrls(
+    @SerialName("medium")
+    val medium: String? = null,
 )

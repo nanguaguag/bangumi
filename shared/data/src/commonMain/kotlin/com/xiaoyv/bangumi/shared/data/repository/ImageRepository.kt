@@ -25,5 +25,7 @@ interface ImageRepository {
 
     suspend fun fetchPixivPictureDetail(id: String): Result<List<ComposeGallery>>
 
+    suspend fun fetchPixivIllust(id: String): Result<com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllust>
+
     suspend fun fetchAnimePictureTag(data: ComposeMono): Result<List<String>>
 }
