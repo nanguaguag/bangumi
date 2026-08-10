@@ -47,17 +47,18 @@ class PixivLoginViewModel(
                             pixivUserName = user.name.orEmpty(),
                             pixivUserAvatar = user.profileImageUrls?.medium.orEmpty(),
                             loginSuccess = false,
+                            isLoggingIn = false,
                         )
                     }
                     loadUserProfile(user.id)
                 }
                 .onFailure {
                     debugLog { "PixivLogin refreshSync: fetchCurrentUser FAILED=${it.message}" }
-                    reduceContent { state.copy(isLoggedIn = true) }
+                    reduceContent { state.copy(isLoggedIn = true, isLoggingIn = false) }
                 }
         } else {
             debugLog { "PixivLogin refreshSync: not logged in" }
-            reduceContent { state.copy(isLoggedIn = false, currentUser = null, userProfile = null) }
+            reduceContent { state.copy(isLoggedIn = false, isLoggingIn = false, currentUser = null, userProfile = null) }
         }
     }
 
@@ -84,6 +85,7 @@ class PixivLoginViewModel(
             is PixivLoginEvent.Action.OnDismissTokenDialog -> onDismissTokenDialog()
             is PixivLoginEvent.Action.OnTokenInput -> onTokenInput(event.token)
             is PixivLoginEvent.Action.OnSubmitToken -> onSubmitToken()
+            is PixivLoginEvent.Action.OnDismissLoginSuccess -> onDismissLoginSuccess()
             is PixivLoginEvent.Action.OnLogout -> onLogout()
         }
     }
@@ -137,8 +139,6 @@ class PixivLoginViewModel(
                         )
                     }
                     loadUserProfile(user.id)
-                    kotlinx.coroutines.delay(3000)
-                    reduceContent { state.copy(loginSuccess = false) }
                 }
                 .onFailure {
                     reduceContent {
@@ -150,8 +150,6 @@ class PixivLoginViewModel(
                             tokenInput = "",
                         )
                     }
-                    kotlinx.coroutines.delay(3000)
-                    reduceContent { state.copy(loginSuccess = false) }
                 }
         }.onFailure {
             debugLog { "Token login failed: ${it.message}" }
@@ -162,6 +160,10 @@ class PixivLoginViewModel(
                 )
             }
         }
+    }
+
+    private fun onDismissLoginSuccess() = action {
+        reduceContent { state.copy(loginSuccess = false) }
     }
 
     private fun onLogout() = action {

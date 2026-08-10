@@ -91,7 +91,10 @@ private fun PreviewMainScreenContent(
     onUiEvent: (PreviewMainEvent.UI) -> Unit,
     onActionEvent: (PreviewMainEvent.Action) -> Unit,
 ) {
-    val pagerState = rememberPagerState(state.index) {
+    if (state.items.isEmpty()) return
+
+    val initialPage = state.index.coerceIn(0, state.items.lastIndex)
+    val pagerState = rememberPagerState(initialPage) {
         state.items.size
     }
 

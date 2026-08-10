@@ -37,6 +37,8 @@ data class GalleryState(
     // ---- 相关图片 ----
     @SerialName("relatedIllusts") val relatedIllusts: List<ComposePixivIllust> = emptyList(),
     @SerialName("relatedLoading") val relatedLoading: Boolean = false,
+    @SerialName("relatedHasMore") val relatedHasMore: Boolean = true,
+    @SerialName("relatedNextUrl") val relatedNextUrl: String? = null,
 
     // ---- 标签 ----
     @SerialName("bannedTags") val bannedTags: List<String> = emptyList(),

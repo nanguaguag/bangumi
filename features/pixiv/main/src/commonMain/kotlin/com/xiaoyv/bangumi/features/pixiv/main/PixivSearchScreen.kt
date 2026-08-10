@@ -37,6 +37,7 @@ import com.xiaoyv.bangumi.shared.ui.component.image.StateImage
 import com.xiaoyv.bangumi.shared.ui.component.layout.state.StateLazyVerticalStaggeredGrid
 import com.xiaoyv.bangumi.shared.ui.component.layout.state.StateLayout
 import com.xiaoyv.bangumi.shared.ui.component.navigation.Screen
+import com.xiaoyv.bangumi.shared.ui.component.navigation.pixivArtworkSharedElement
 import com.xiaoyv.bangumi.shared.ui.component.paging.LazyPagingItems
 import com.xiaoyv.bangumi.shared.ui.component.paging.collectAsLazyPagingItems
 import com.xiaoyv.bangumi.shared.ui.component.space.BrushVerticalTransparentToHalfBlack
@@ -115,7 +116,16 @@ private fun PixivSearchScreen(
                         .aspectRatio(item.aspect),
                     item = item,
                     onClick = {
-                        onUiEvent(PixivSearchEvent.UI.OnNavScreen(Screen.Gallery(item.id, item.type)))
+                        onUiEvent(
+                            PixivSearchEvent.UI.OnNavScreen(
+                                Screen.Gallery(
+                                    id = item.id,
+                                    type = item.type,
+                                    transitionImage = item.image,
+                                    transitionAspect = item.aspect,
+                                ),
+                            ),
+                        )
                     }
                 )
             }
@@ -133,7 +143,8 @@ private fun PixivSearchPictureItem(
         StateImage(
             modifier = Modifier
                 .matchParentSize()
-                .background(item.uiColor),
+                .background(item.uiColor)
+                .pixivArtworkSharedElement(item.id),
             model = item.image
         )
 

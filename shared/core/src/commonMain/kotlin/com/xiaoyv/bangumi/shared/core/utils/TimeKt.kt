@@ -197,3 +197,20 @@ fun String.parseAgoToTimestamp(now: Long = System.currentTimeMillis()): Long {
 
     return now - totalMillis
 }
+
+/**
+ * 将 Pixiv 的 ISO-8601 时间显示为中文年月日和 12 小时制时间。
+ * 例如：2026-08-03T23:10:08+09:00 -> 2026年8月3日下午11点10分
+ */
+fun String?.formatPixivDateTime(timeZone: TimeZone = TimeZone.currentSystemDefault()): String {
+    if (this.isNullOrBlank()) return ""
+    return runCatching {
+        val dateTime = Instant.parse(this).toLocalDateTime(timeZone)
+        val period = if (dateTime.hour < 12) "上午" else "下午"
+        val hour = when (val value = dateTime.hour % 12) {
+            0 -> 12
+            else -> value
+        }
+        "${dateTime.year}年${dateTime.month.number}月${dateTime.day}日${period}${hour}点${dateTime.minute}分"
+    }.getOrDefault(this.orEmpty())
+}

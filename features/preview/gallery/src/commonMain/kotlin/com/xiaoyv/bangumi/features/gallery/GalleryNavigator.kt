@@ -13,6 +13,9 @@ val galleryModule = module {
         navigation<Screen.Gallery> { key ->
             GalleryRoute(
                 viewModel = koinViewModel { parametersOf(key) },
+                transitionImage = key.transitionImage,
+                transitionAspect = key.transitionAspect,
+                transitionArtworkId = key.id,
                 onNavScreen = { navigator.navigate(it) },
                 onNavUp = { navigator.goBack() }
             )

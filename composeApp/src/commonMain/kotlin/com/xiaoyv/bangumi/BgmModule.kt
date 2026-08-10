@@ -37,6 +37,7 @@ import com.xiaoyv.bangumi.features.mono.page.business.MonoPageViewModel
 import com.xiaoyv.bangumi.features.notification.business.NotificationViewModel
 import com.xiaoyv.bangumi.features.pixiv.login.business.PixivLoginViewModel
 import com.xiaoyv.bangumi.features.pixiv.main.business.PixivMainViewModel
+import com.xiaoyv.bangumi.features.pixiv.main.business.PixivSearchViewModel
 import com.xiaoyv.bangumi.features.preivew.album.business.PreviewAlbumViewModel
 import com.xiaoyv.bangumi.features.preivew.gallery.business.PreviewTextViewModel
 import com.xiaoyv.bangumi.features.preivew.main.business.PreviewMainViewModel
@@ -138,6 +139,7 @@ val commonModule = module {
     viewModelOf(::SubjectBrowserViewModel)
     viewModelOf(::PreviewMainViewModel)
     viewModelOf(::PixivMainViewModel)
+    viewModelOf(::PixivSearchViewModel)
     viewModelOf(::PixivLoginViewModel)
     viewModelOf(::GardenViewModel)
     viewModelOf(::TopicDetailViewModel)

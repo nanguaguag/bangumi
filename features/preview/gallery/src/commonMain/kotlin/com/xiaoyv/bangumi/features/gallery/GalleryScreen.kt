@@ -2,6 +2,7 @@ package com.xiaoyv.bangumi.features.gallery
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,19 +10,24 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.itemsIndexed
@@ -37,10 +43,13 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.OpenInBrowser
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -58,6 +67,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,8 +82,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xiaoyv.bangumi.core_resource.resources.Res
 import com.xiaoyv.bangumi.core_resource.resources.global_artwork
@@ -110,6 +125,7 @@ import com.xiaoyv.bangumi.features.gallery.business.GalleryViewModel
 import com.xiaoyv.bangumi.shared.core.mvi.BaseState
 import com.xiaoyv.bangumi.shared.core.types.list.ListAlbumType
 import com.xiaoyv.bangumi.shared.core.utils.formatFileSize
+import com.xiaoyv.bangumi.shared.core.utils.formatPixivDateTime
 import com.xiaoyv.bangumi.shared.data.model.response.image.ComposeGallery
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivComment
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllust
@@ -119,6 +135,7 @@ import com.xiaoyv.bangumi.shared.ui.component.bar.BgmTopAppBar
 import com.xiaoyv.bangumi.shared.ui.component.image.StateImage
 import com.xiaoyv.bangumi.shared.ui.component.layout.state.StateLayout
 import com.xiaoyv.bangumi.shared.ui.component.navigation.Screen
+import com.xiaoyv.bangumi.shared.ui.component.navigation.pixivArtworkSharedElement
 import com.xiaoyv.bangumi.shared.ui.component.space.BrushVerticalTransparentToHalfBlack
 import com.xiaoyv.bangumi.shared.ui.component.space.LayoutPaddingHalf
 import com.xiaoyv.bangumi.shared.ui.kts.collectBaseSideEffect
@@ -129,6 +146,9 @@ import org.orbitmvi.orbit.compose.collectAsState
 @Composable
 fun GalleryRoute(
     viewModel: GalleryViewModel,
+    transitionImage: String,
+    transitionAspect: Float,
+    transitionArtworkId: String,
     onNavUp: () -> Unit,
     onNavScreen: (Screen) -> Unit,
 ) {
@@ -148,6 +168,9 @@ fun GalleryRoute(
 
     GalleryScreen(
         baseState = baseState,
+        transitionImage = transitionImage,
+        transitionAspect = transitionAspect,
+        transitionArtworkId = transitionArtworkId,
         onActionEvent = viewModel::onEvent,
         onUiEvent = {
             when (it) {
@@ -162,10 +185,16 @@ fun GalleryRoute(
 @Composable
 private fun GalleryScreen(
     baseState: BaseState<GalleryState>,
+    transitionImage: String,
+    transitionAspect: Float,
+    transitionArtworkId: String,
     onUiEvent: (GalleryEvent.UI) -> Unit,
     onActionEvent: (GalleryEvent.Action) -> Unit,
 ) {
     val state = baseState.payload
+    // 数据到达后，真实首图会接管同一共享 key；在此之前始终保留已缓存的列表图。
+    val showTransitionHero = transitionImage.isNotBlank() && state?.images.isNullOrEmpty()
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
@@ -214,21 +243,56 @@ private fun GalleryScreen(
                 )
             }
         },
-    ) {
-        StateLayout(
+    ) { paddingValues ->
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(it),
-            onRefresh = { onActionEvent(GalleryEvent.Action.OnRefresh(it)) },
-            baseState = baseState,
-        ) { contentState ->
-            if (contentState.isPixiv) {
-                PixivGalleryContent(contentState, onUiEvent, onActionEvent)
-            } else {
-                GalleryImageGrid(contentState, onUiEvent, onActionEvent)
+                .padding(paddingValues),
+        ) {
+            StateLayout(
+                modifier = Modifier.fillMaxSize(),
+                onRefresh = { onActionEvent(GalleryEvent.Action.OnRefresh(it)) },
+                baseState = baseState,
+            ) { contentState ->
+                if (contentState.isPixiv) {
+                    PixivGalleryContent(
+                        state = contentState,
+                        transitionImage = transitionImage,
+                        transitionArtworkId = transitionArtworkId,
+                        onUiEvent = onUiEvent,
+                        onActionEvent = onActionEvent,
+                    )
+                } else {
+                    GalleryImageGrid(contentState, onUiEvent, onActionEvent)
+                }
+            }
+
+            if (showTransitionHero) {
+                PixivGalleryTransitionHero(
+                    image = transitionImage,
+                    aspect = transitionAspect,
+                    artworkId = transitionArtworkId,
+                )
             }
         }
     }
+}
+
+@Composable
+private fun PixivGalleryTransitionHero(
+    image: String,
+    aspect: Float,
+    artworkId: String,
+) {
+    StateImage(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(aspect.coerceIn(0.25f, 4f))
+            .pixivArtworkSharedElement(artworkId),
+        model = image,
+        contentDescription = null,
+        blurLoading = false,
+    )
 }
 
 @Composable
@@ -325,15 +389,23 @@ private fun GalleryTopBarMenu(
 @Composable
 private fun PixivGalleryContent(
     state: GalleryState,
+    transitionImage: String,
+    transitionArtworkId: String,
     onUiEvent: (GalleryEvent.UI) -> Unit,
     onActionEvent: (GalleryEvent.Action) -> Unit,
 ) {
     val clipboardManager = LocalClipboardManager.current
+    var showSelectionDialog by remember { mutableStateOf(false) }
+    var selectionAnchorIndex by remember { mutableStateOf<Int?>(null) }
+    var selectedIndexes by remember { mutableStateOf(emptySet<Int>()) }
+
+    val listState = rememberLazyListState()
 
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
     ) {
-        // 图片区域
+        // 图片区域：长按图片进入保存菜单
         itemsIndexed(state.images) { index, item ->
             GalleryPictureItem(
                 modifier = Modifier
@@ -341,18 +413,29 @@ private fun PixivGalleryContent(
                     .aspectRatio(item.aspect),
                 item = item,
                 showOriginal = state.showOriginal,
+                fallbackImage = if (index == 0) transitionImage else "",
+                sharedArtworkId = transitionArtworkId.takeIf { index == 0 && transitionImage.isNotBlank() },
                 onClick = {
-                    onUiEvent(
-                        GalleryEvent.UI.OnNavScreen(
-                            Screen.PreviewMain(
-                                index,
-                                state.images.map {
-                                    if (state.showOriginal && it.original.isNotBlank()) it.original else it.image
-                                }
+                    val previewItems = state.images.mapNotNull { image ->
+                        (if (state.showOriginal && image.original.isNotBlank()) image.original else image.image)
+                            .takeIf(String::isNotBlank)
+                    }
+                    if (previewItems.isNotEmpty()) {
+                        val previewIndex = previewItems.indexOf(
+                            if (state.showOriginal && item.original.isNotBlank()) item.original else item.image
+                        ).coerceAtLeast(0)
+                        onUiEvent(
+                            GalleryEvent.UI.OnNavScreen(
+                                Screen.PreviewMain(previewIndex, previewItems)
                             )
                         )
-                    )
-                }
+                    }
+                },
+                onLongClick = {
+                    selectionAnchorIndex = index
+                    selectedIndexes = state.images.indices.toSet()
+                    showSelectionDialog = true
+                },
             )
         }
 
@@ -370,8 +453,8 @@ private fun PixivGalleryContent(
             Spacer(modifier = Modifier.height(48.dp))
         }
 
-        // 评论区
-        if (state.isPixiv) {
+        // 没有评论时不占用作品页空间；发表评论后 ViewModel 会立即插入新评论并显示
+        if (state.comments.isNotEmpty()) {
             item(key = "comments") {
                 CommentsSection(
                     state = state,
@@ -380,18 +463,168 @@ private fun PixivGalleryContent(
             }
         }
 
-        // 相关图片
-        if (state.relatedIllusts.isNotEmpty()) {
+        if (state.relatedIllusts.isNotEmpty() || state.relatedLoading) {
             item(key = "related_illusts") {
                 RelatedIllustsSection(
                     relatedIllusts = state.relatedIllusts,
-                    relatedLoading = state.relatedLoading,
                     onNavScreen = { screen ->
                         onUiEvent(GalleryEvent.UI.OnNavScreen(screen))
                     },
                 )
             }
+
+            if (state.relatedHasMore || state.relatedLoading) {
+                item(key = "related_illusts_footer") {
+                    RelatedIllustsFooter(
+                        relatedLoading = state.relatedLoading,
+                        hasMore = state.relatedHasMore,
+                        onLoadMore = { onActionEvent(GalleryEvent.Action.OnLoadMoreRelated) },
+                    )
+                }
+            }
         }
+    }
+
+    if (showSelectionDialog) {
+        AlertDialog(
+            onDismissRequest = { showSelectionDialog = false },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+            title = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "保存图片",
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
+                    Text(
+                        text = "已选择 ${selectedIndexes.size}/${state.images.size}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.widthIn(max = 420.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        selectionAnchorIndex?.let { anchor ->
+                            TextButton(
+                                onClick = { selectedIndexes = setOf(anchor) },
+                                contentPadding = PaddingValues(horizontal = 8.dp),
+                            ) { Text("仅保存当前") }
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        TextButton(
+                            onClick = { selectedIndexes = state.images.indices.toSet() },
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                        ) { Text("全选") }
+                        TextButton(
+                            onClick = { selectedIndexes = emptySet() },
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                        ) { Text("全不选") }
+                    }
+
+                    // 使用缩略图网格替代文字列表；每张图的勾选按钮固定在右上角。
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 380.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(state.images.chunked(2)) { rowItems ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                rowItems.forEachIndexed { rowIndex, image ->
+                                    val index = state.images.indexOf(image)
+                                    val checked = index in selectedIndexes
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(0.78f)
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .border(
+                                                width = if (checked) 2.dp else 1.dp,
+                                                color = if (checked) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.outlineVariant,
+                                                shape = RoundedCornerShape(16.dp),
+                                            )
+                                            .clickable {
+                                                selectedIndexes = if (checked) {
+                                                    selectedIndexes - index
+                                                } else {
+                                                    selectedIndexes + index
+                                                }
+                                            },
+                                    ) {
+                                        StateImage(
+                                            modifier = Modifier.fillMaxSize(),
+                                            model = image.image.ifBlank { image.original },
+                                            contentDescription = "第 ${index + 1} 张图片",
+                                            contentScale = ContentScale.Crop,
+                                            blurLoading = false,
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(8.dp)
+                                                .size(30.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            androidx.compose.material3.Checkbox(
+                                                modifier = Modifier.size(30.dp),
+                                                checked = checked,
+                                                onCheckedChange = { value ->
+                                                    selectedIndexes = if (value) {
+                                                        selectedIndexes + index
+                                                    } else {
+                                                        selectedIndexes - index
+                                                    }
+                                                },
+                                            )
+                                        }
+                                        Text(
+                                            modifier = Modifier
+                                                .align(Alignment.BottomStart)
+                                                .padding(8.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(Color.Black.copy(alpha = 0.58f))
+                                                .padding(horizontal = 7.dp, vertical = 3.dp),
+                                            text = "${index + 1}",
+                                            color = Color.White,
+                                            style = MaterialTheme.typography.labelMedium,
+                                        )
+                                    }
+                                }
+                                if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = selectedIndexes.isNotEmpty(),
+                    onClick = {
+                        showSelectionDialog = false
+                        onActionEvent(GalleryEvent.Action.OnDownload(selectedIndexes.sorted()))
+                    },
+                ) {
+                    Text("保存${selectedIndexes.size.takeIf { it > 0 }?.let { " ($it)" }.orEmpty()}")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSelectionDialog = false }) { Text("取消") }
+            },
+        )
     }
 }
 
@@ -443,27 +676,6 @@ private fun IllustDetailSection(
             )
         }
 
-        // 下载原图
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            ),
-            shape = RoundedCornerShape(12.dp),
-        ) {
-            TextButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { onActionEvent(GalleryEvent.Action.OnDownload) }
-            ) {
-                Icon(
-                    imageVector = BgmIcons.Download,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(stringResource(Res.string.pixiv_download))
-            }
-        }
     }
 }
 
@@ -537,6 +749,29 @@ private fun AuthorCard(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
+private fun IllustStat(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    value: String,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(15.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 private fun IllustInfoCard(
     illust: ComposePixivIllust,
     clipboardManager: androidx.compose.ui.platform.ClipboardManager,
@@ -574,53 +809,35 @@ private fun IllustInfoCard(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 统计数据：浏览量 / 收藏量 / 日期紧凑一行
+            // 点赞 / 收藏 / 浏览 / 发布时间：小字号、左对齐，避免统计信息被挤成多行
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // 浏览量
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Icon(
-                        imageVector = BgmIcons.Visibility,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = "${illust.totalView}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-
-                // 收藏量
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Icon(
-                        imageVector = BgmIcons.Bookmark,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = "${illust.totalBookmarks}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-
-                // 发布日期
-                illust.createDate?.let { date ->
-                    Text(
-                        text = date,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                IllustStat(icon = BgmIcons.Favorite, value = illust.likeCount.toString())
+                IllustStat(icon = BgmIcons.Bookmark, value = illust.totalBookmarks.toString())
+                IllustStat(icon = BgmIcons.Visibility, value = illust.totalView.toString())
+                illust.createDate?.takeIf { it.isNotBlank() }?.let { date ->
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            imageVector = BgmIcons.Schedule,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = date.formatPixivDateTime(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
 
@@ -741,23 +958,30 @@ private fun TagPill(
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f))
+            .widthIn(max = 280.dp)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
+            modifier = Modifier.weight(1f, fill = false),
             text = "#${tag.name.orEmpty()}",
             style = MaterialTheme.typography.labelMedium,
             color = if (isBanned) MaterialTheme.colorScheme.error
             else MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         tag.translatedName?.let { translated ->
             if (translated.isNotBlank() && translated != tag.name) {
                 Text(
+                    modifier = Modifier.weight(1f, fill = false),
                     text = " $translated",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -862,6 +1086,102 @@ private fun CommentsSection(
     }
 }
 
+private val pixivEmojiFiles = mapOf(
+    "(normal)" to "101.png",
+    "(surprise)" to "102.png",
+    "(serious)" to "103.png",
+    "(heaven)" to "104.png",
+    "(happy)" to "105.png",
+    "(excited)" to "106.png",
+    "(sing)" to "107.png",
+    "(cry)" to "108.png",
+    "(normal2)" to "201.png",
+    "(shame2)" to "202.png",
+    "(love2)" to "203.png",
+    "(interesting2)" to "204.png",
+    "(blush2)" to "205.png",
+    "(fire2)" to "206.png",
+    "(angry2)" to "207.png",
+    "(shine2)" to "208.png",
+    "(panic2)" to "209.png",
+    "(normal3)" to "301.png",
+    "(satisfaction3)" to "302.png",
+    "(surprise3)" to "303.png",
+    "(smile3)" to "304.png",
+    "(shock3)" to "305.png",
+    "(gaze3)" to "306.png",
+    "(wink3)" to "307.png",
+    "(happy3)" to "308.png",
+    "(excited3)" to "309.png",
+    "(love3)" to "310.png",
+    "(normal4)" to "401.png",
+    "(surprise4)" to "402.png",
+    "(serious4)" to "403.png",
+    "(love4)" to "404.png",
+    "(shine4)" to "405.png",
+    "(sweat4)" to "406.png",
+    "(shame4)" to "407.png",
+    "(sleep4)" to "408.png",
+    "(heart)" to "501.png",
+    "(teardrop)" to "502.png",
+    "(star)" to "503.png",
+)
+
+private data class PixivCommentPart(val text: String? = null, val emoji: String? = null)
+
+private fun parsePixivComment(text: String): List<PixivCommentPart> {
+    val result = mutableListOf<PixivCommentPart>()
+    var cursor = 0
+    val pattern = "\\([^()]+\\)".toRegex()
+    pattern.findAll(text).forEach { match ->
+        if (match.range.first > cursor) {
+            result += PixivCommentPart(text = text.substring(cursor, match.range.first))
+        }
+        val token = match.value
+        if (token in pixivEmojiFiles) result += PixivCommentPart(emoji = token)
+        else result += PixivCommentPart(text = token)
+        cursor = match.range.last + 1
+    }
+    if (cursor < text.length) result += PixivCommentPart(text = text.substring(cursor))
+    return result.ifEmpty { listOf(PixivCommentPart(text = text)) }
+}
+
+@Composable
+private fun CommentEmojiText(
+    text: String,
+    style: androidx.compose.ui.text.TextStyle,
+) {
+    val parts = remember(text) { parsePixivComment(text) }
+    val inlineContent = parts.mapIndexedNotNull { index, part ->
+        val file = part.emoji?.let { pixivEmojiFiles[it] } ?: return@mapIndexedNotNull null
+        "pixiv-emoji-$index" to InlineTextContent(
+            placeholder = Placeholder(20.sp, 20.sp, PlaceholderVerticalAlign.Center),
+            children = {
+                StateImage(
+                    modifier = Modifier.fillMaxSize(),
+                    model = "https://s.pximg.net/common/images/emoji/$file",
+                    contentScale = ContentScale.Fit,
+                    blurLoading = false,
+                )
+            },
+        )
+    }.toMap()
+    val annotatedText = buildAnnotatedString {
+        parts.forEachIndexed { index, part ->
+            if (part.emoji != null) {
+                appendInlineContent("pixiv-emoji-$index", part.emoji)
+            } else {
+                append(part.text.orEmpty())
+            }
+        }
+    }
+    Text(
+        text = annotatedText,
+        inlineContent = inlineContent,
+        style = style,
+    )
+}
+
 @Composable
 private fun CommentItem(
     comment: ComposePixivComment,
@@ -895,12 +1215,12 @@ private fun CommentItem(
                     text = comment.user?.name.orEmpty(),
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
                 )
                 comment.date?.let { date ->
                     Text(
-                        text = date,
+                        text = date.formatPixivDateTime(),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -911,11 +1231,23 @@ private fun CommentItem(
             comment.comment?.let { content ->
                 if (content.isNotBlank()) {
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(
+                    CommentEmojiText(
                         text = content,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
+            }
+
+            comment.stamp?.url?.takeIf { it.isNotBlank() }?.let { stampUrl ->
+                Spacer(modifier = Modifier.height(4.dp))
+                StateImage(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    model = stampUrl,
+                    contentScale = ContentScale.Fit,
+                    blurLoading = false,
+                )
             }
 
             // 操作：回复 / 查看回复
@@ -927,7 +1259,7 @@ private fun CommentItem(
                     Text(
                         text = stringResource(Res.string.reply_comment),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.secondary,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
                 if (!isReply && comment.hasReplies) {
@@ -935,7 +1267,7 @@ private fun CommentItem(
                         Text(
                             text = stringResource(Res.string.pixiv_comment_view_replies),
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.secondary,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
@@ -1049,14 +1381,12 @@ private fun CommentInputBar(
 @Composable
 private fun RelatedIllustsSection(
     relatedIllusts: List<ComposePixivIllust>,
-    relatedLoading: Boolean,
     onNavScreen: (Screen) -> Unit,
 ) {
     Column(
         modifier = Modifier.padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // 标题
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = stringResource(Res.string.pixiv_related_illusts),
@@ -1073,50 +1403,52 @@ private fun RelatedIllustsSection(
             }
         }
 
-        // 3 列网格（chunked 布局，避免嵌套同向滚动）
-        relatedIllusts.chunked(3).forEach { rowIllusts ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                rowIllusts.forEach { illust ->
-                    val squareMedium = illust.imageUrls?.squareMedium
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .aspectRatio(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable {
-                                onNavScreen(
-                                    Screen.Gallery(illust.id.toString(), ListAlbumType.PIVIX)
-                                )
-                            },
-                    ) {
-                        AsyncImage(
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                            model = squareMedium,
-                            contentDescription = illust.title,
-                        )
-                    }
-                }
-                // 补足一行中的空位
-                repeat(3 - rowIllusts.size) {
-                    Spacer(modifier = Modifier.weight(1f))
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            relatedIllusts.forEach { illust ->
+                Box(
+                    modifier = Modifier
+                        .size(120.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            onNavScreen(Screen.Gallery(illust.id.toString(), ListAlbumType.PIVIX))
+                        },
+                ) {
+                    StateImage(
+                        modifier = Modifier.fillMaxSize(),
+                        model = illust.imageUrls?.squareMedium,
+                        contentDescription = illust.title,
+                        contentScale = ContentScale.Crop,
+                    )
                 }
             }
         }
+    }
+}
 
-        // 加载中
-        if (relatedLoading && relatedIllusts.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(28.dp))
-            }
+@Composable
+private fun RelatedIllustsFooter(
+    relatedLoading: Boolean,
+    hasMore: Boolean,
+    onLoadMore: () -> Unit,
+) {
+    // 该 item 只有接近列表末尾才会进入组合；新页插入后它被推离视口，
+    // 后续再次滑到底会重新组合并请求下一页。
+    LaunchedEffect(Unit) {
+        if (hasMore && !relatedLoading) onLoadMore()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (relatedLoading) {
+            CircularProgressIndicator(modifier = Modifier.size(28.dp))
         }
     }
 }
@@ -1139,16 +1471,20 @@ private fun GalleryImageGrid(
                 item = item,
                 showOriginal = state.showOriginal,
                 onClick = {
-                    onUiEvent(
-                        GalleryEvent.UI.OnNavScreen(
-                            Screen.PreviewMain(
-                                index,
-                                state.images.map {
-                                    if (state.showOriginal && it.original.isNotBlank()) it.original else it.image
-                                }
+                    val previewItems = state.images.mapNotNull { image ->
+                        (if (state.showOriginal && image.original.isNotBlank()) image.original else image.image)
+                            .takeIf(String::isNotBlank)
+                    }
+                    if (previewItems.isNotEmpty()) {
+                        val previewIndex = previewItems.indexOf(
+                            if (state.showOriginal && item.original.isNotBlank()) item.original else item.image
+                        ).coerceAtLeast(0)
+                        onUiEvent(
+                            GalleryEvent.UI.OnNavScreen(
+                                Screen.PreviewMain(previewIndex, previewItems)
                             )
                         )
-                    )
+                    }
                 }
             )
         }
@@ -1156,20 +1492,49 @@ private fun GalleryImageGrid(
 }
 
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun GalleryPictureItem(
     modifier: Modifier,
     item: ComposeGallery,
     showOriginal: Boolean = false,
+    fallbackImage: String = "",
+    sharedArtworkId: String? = null,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
 ) {
-    Box(modifier = Modifier.clickable(onClick = onClick).then(modifier)) {
+    val image = if (showOriginal && item.original.isNotBlank()) item.original else item.image
+    val baseImageModifier = Modifier
+        .fillMaxSize()
+        .background(item.uiColor)
+    val imageModifier = if (sharedArtworkId == null) {
+        baseImageModifier
+    } else {
+        baseImageModifier.pixivArtworkSharedElement(sharedArtworkId)
+    }
+
+    Box(
+        modifier = Modifier
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
+            .then(modifier)
+    ) {
+        // 首图在高分图尚未解码时保留列表缩略图，避免共享转场结束后闪回加载态。
         StateImage(
-            modifier = Modifier
-                .matchParentSize()
-                .background(item.uiColor),
-            model = if (showOriginal && item.original.isNotBlank()) item.original else item.image
+            modifier = imageModifier,
+            model = fallbackImage.ifBlank { image },
+            blurLoading = fallbackImage.isBlank(),
         )
+        if (fallbackImage.isNotBlank() && fallbackImage != image) {
+            AsyncImage(
+                modifier = Modifier.fillMaxSize(),
+                model = image,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+            )
+        }
 
         Text(
             modifier = Modifier

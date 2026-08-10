@@ -19,7 +19,7 @@ interface ImageRepository {
         deniedTags: String? = null,
     ): Pager<Int, ComposeGallery>
 
-    fun fetchPixivPictures(tag: String): Pager<Int, ComposeGallery>
+    fun fetchPixivPictures(tag: String): Pager<String, ComposeGallery>
 
     suspend fun fetchAlbumList(param: ListAlbumParam, page: Int, size: Int): Result<List<ComposeGallery>>
 

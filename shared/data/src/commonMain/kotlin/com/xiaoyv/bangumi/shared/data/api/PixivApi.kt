@@ -11,9 +11,11 @@ import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivMeStateRe
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivRelatedResult
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivToken
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivUserDetailResult
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivWebIllustResult
 import de.jensklingenberg.ktorfit.http.Field
 import de.jensklingenberg.ktorfit.http.FormUrlEncoded
 import de.jensklingenberg.ktorfit.http.GET
+import de.jensklingenberg.ktorfit.http.Path
 import de.jensklingenberg.ktorfit.http.POST
 import de.jensklingenberg.ktorfit.http.Query
 
@@ -69,6 +71,12 @@ interface PixivApi {
     suspend fun getIllustDetail(
         @Query("illust_id") illustId: Long,
     ): ComposePixivIllustDetailResult
+
+    @GET("https://www.pixiv.net/ajax/illust/{illustId}")
+    suspend fun getIllustWebDetail(
+        @Path("illustId") illustId: Long,
+        @Query("lang") lang: String = "zh",
+    ): ComposePixivWebIllustResult
 
     /**
      * 获取当前登录用户简要信息。
@@ -144,7 +152,24 @@ interface PixivApi {
     @GET("https://app-api.pixiv.net/v2/illust/related")
     suspend fun getIllustRelated(
         @Query("illust_id") illustId: Long,
+        @Query("filter") filter: String = "for_android",
     ): ComposePixivRelatedResult
+
+    /**
+     * 使用 Pixiv 返回的完整续页 URL 请求相关作品，避免丢失服务端 cursor 参数。
+     */
+    @GET("")
+    suspend fun getIllustRelatedByUrl(
+        @de.jensklingenberg.ktorfit.http.Url url: String,
+    ): ComposePixivRelatedResult
+
+    /**
+     * 使用 Pixiv 返回的完整续页 URL 请求搜索结果，避免自行重建分页参数。
+     */
+    @GET("")
+    suspend fun searchIllustByUrl(
+        @de.jensklingenberg.ktorfit.http.Url url: String,
+    ): ComposePixivIllustSearchResult
 
     /**
      * 获取作品评论。

@@ -128,15 +128,23 @@ class GalleryViewModel(
                 block1 = { pixivRepoUseCase.fetchIllustComments(args.id.toLongOrNull() ?: 0L) },
                 block2 = { pixivRepoUseCase.fetchRelatedIllusts(args.id.toLongOrNull() ?: 0L) },
             ).onSuccess {
+                val relatedPage = it.data2
+                val nextUrl = relatedPage.nextUrl?.takeIf { it.isNotBlank() }
+                debugLog {
+                    "Pixiv related initial: count=${relatedPage.illusts.size}, nextUrl=$nextUrl"
+                }
                 reduceContent {
                     state.copy(
                         comments = it.data1,
-                        relatedIllusts = it.data2,
+                        relatedIllusts = relatedPage.illusts,
                         commentsLoading = false,
                         relatedLoading = false,
+                        relatedHasMore = nextUrl != null,
+                        relatedNextUrl = nextUrl,
                     )
                 }
             }.onFailure {
+                debugLog { "Failed to load Pixiv related illusts: ${it.message}" }
                 reduceContent {
                     state.copy(
                         commentsLoading = false,
@@ -163,7 +171,8 @@ class GalleryViewModel(
             is GalleryEvent.Action.OnShare -> onShare()
             is GalleryEvent.Action.OnCopyLink -> onCopyLink()
             is GalleryEvent.Action.OnTagClick -> onTagClick(event.tag)
-            is GalleryEvent.Action.OnDownload -> onDownload()
+            is GalleryEvent.Action.OnDownload -> onDownload(event.indexes)
+            is GalleryEvent.Action.OnLoadMoreRelated -> onLoadMoreRelated()
             is GalleryEvent.Action.OnToggleReplies -> onToggleReplies(event.commentId)
             is GalleryEvent.Action.OnCommentInputChange -> onCommentInputChange(event.text)
             is GalleryEvent.Action.OnReplyTarget -> onReplyTarget(event.comment)
@@ -263,36 +272,72 @@ class GalleryViewModel(
         postToast { "已复制链接" }
     }
 
-    private fun onDownload() = action {
+    private fun onDownload(indexes: List<Int>) = action {
         val currentState = stateRaw
         val images = currentState.images
         if (images.isEmpty()) return@action
-        // 取当前可见的原图 URL
-        val url = if (currentState.showOriginal) {
-            images.firstOrNull()?.original?.ifBlank { images.first().image }
-        } else {
-            images.first().image
-        } ?: return@action
 
-        // Pixiv 图片走代理重写，避免 i.pximg.net 防盗链 403
-        val downloadUrl = if (url.contains(HOST_PIXIV_IMAGE)) {
-            userManager.settings.network.pixivImageHost + url.substringAfter(HOST_PIXIV_IMAGE).trimStart('/')
-        } else {
-            url
+        val selectedIndexes = if (indexes.isEmpty()) listOf(0) else indexes
+            .filter { it in images.indices }
+            .distinct()
+        if (selectedIndexes.isEmpty()) return@action
+
+        var savedCount = 0
+        selectedIndexes.forEach { index ->
+            val image = images[index]
+            val url = image.original.ifBlank { image.image }
+            if (url.isBlank()) return@forEach
+            val downloadUrl = if (url.contains(HOST_PIXIV_IMAGE)) {
+                userManager.settings.network.pixivImageHost + url.substringAfter(HOST_PIXIV_IMAGE).trimStart('/')
+            } else {
+                url
+            }
+            val extension = url.substringAfterLast('.', "jpg").takeIf { it.length in 3..4 } ?: "jpg"
+            val fileName = if (images.size > 1) {
+                "${currentState.id}_p${index + 1}.$extension"
+            } else {
+                "${currentState.id}.$extension"
+            }
+            System.downloadImage(downloadUrl, fileName, userManager.pixivDownloadDir)
+                .onSuccess { savedCount++ }
+                .onFailure { error -> debugLog { "downloadImage FAILED=${error.message}" } }
         }
 
-        // 文件名：作品 ID + 原始扩展名（默认 jpg）
-        val extension = url.substringAfterLast('.', "jpg").takeIf { it.length in 3..4 } ?: "jpg"
-        val fileName = "${currentState.id}.$extension"
-        val subDir = userManager.pixivDownloadDir
+        if (savedCount > 0) {
+            postToast { "已保存 $savedCount 张图片" }
+        } else {
+            postToast { getString(Res.string.pixiv_download_fail, "unknown") }
+        }
+    }
 
-        System.downloadImage(downloadUrl, fileName, subDir)
-            .onSuccess { path ->
-                postToast { getString(Res.string.pixiv_download_success, path) }
+    private fun onLoadMoreRelated() = action {
+        val currentState = stateRaw
+        if (!currentState.isPixiv || currentState.relatedLoading || !currentState.relatedHasMore) return@action
+        val nextUrl = currentState.relatedNextUrl ?: return@action
+        reduceContent { state.copy(relatedLoading = true) }
+
+        pixivRepoUseCase.fetchRelatedIllusts(nextUrl)
+            .onSuccess { page ->
+                val followingUrl = page.nextUrl?.takeIf { it.isNotBlank() && it != nextUrl }
+                debugLog {
+                    "Pixiv related page: count=${page.illusts.size}, nextUrl=$followingUrl"
+                }
+                reduceContent {
+                    val uniqueItems = page.illusts.filterNot { pageItem ->
+                        state.relatedIllusts.any { existingItem -> existingItem.id == pageItem.id }
+                    }
+                    state.copy(
+                        // 服务端 cursor 是唯一的结束条件；跨页去重只影响展示，不能提前截断分页。
+                        relatedIllusts = state.relatedIllusts + uniqueItems,
+                        relatedLoading = false,
+                        relatedHasMore = followingUrl != null,
+                        relatedNextUrl = followingUrl,
+                    )
+                }
             }
             .onFailure {
-                debugLog { "downloadImage FAILED=${it.message}" }
-                postToast { getString(Res.string.pixiv_download_fail, it.errMsg.ifBlank { "unknown" }) }
+                debugLog { "Failed to load Pixiv related page: ${it.message}" }
+                reduceContent { state.copy(relatedLoading = false) }
             }
     }
 

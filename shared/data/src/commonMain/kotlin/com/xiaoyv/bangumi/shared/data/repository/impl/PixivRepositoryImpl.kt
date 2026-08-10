@@ -13,6 +13,7 @@ import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivComment
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivCurrentUser
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllust
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivMeStateResponse
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivRelatedResult
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivToken
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivUserDetailResult
 import com.xiaoyv.bangumi.shared.data.repository.PixivRepository
@@ -164,9 +165,15 @@ class PixivRepositoryImpl(
         }
     }
 
-    override suspend fun fetchRelatedIllusts(illustId: Long): Result<List<ComposePixivIllust>> {
+    override suspend fun fetchRelatedIllusts(illustId: Long): Result<ComposePixivRelatedResult> {
         return client.requestPixivApi { getIllustRelated(illustId) }
-            .map { it.illusts }
+    }
+
+    override suspend fun fetchRelatedIllusts(nextUrl: String): Result<ComposePixivRelatedResult> {
+        require(nextUrl.startsWith("https://app-api.pixiv.net/")) {
+            "Unexpected Pixiv related cursor URL"
+        }
+        return client.requestPixivApi { getIllustRelatedByUrl(nextUrl) }
     }
 
     override suspend fun fetchIllustComments(illustId: Long): Result<List<ComposePixivComment>> {

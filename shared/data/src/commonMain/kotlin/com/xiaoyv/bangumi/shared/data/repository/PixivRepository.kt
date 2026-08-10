@@ -4,6 +4,7 @@ import com.xiaoyv.bangumi.shared.data.model.request.ChallengeParam
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivComment
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivCurrentUser
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllust
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivRelatedResult
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivToken
 import kotlinx.atomicfu.AtomicRef
 
@@ -47,7 +48,12 @@ interface PixivRepository {
     /**
      * 获取相关插画
      */
-    suspend fun fetchRelatedIllusts(illustId: Long): Result<List<ComposePixivIllust>>
+    suspend fun fetchRelatedIllusts(illustId: Long): Result<ComposePixivRelatedResult>
+
+    /**
+     * 通过 Pixiv 响应中的完整 cursor URL 获取下一页相关插画。
+     */
+    suspend fun fetchRelatedIllusts(nextUrl: String): Result<ComposePixivRelatedResult>
 
     /**
      * 获取作品评论

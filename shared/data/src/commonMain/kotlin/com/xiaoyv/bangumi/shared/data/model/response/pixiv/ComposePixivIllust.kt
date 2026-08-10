@@ -3,6 +3,7 @@ package com.xiaoyv.bangumi.shared.data.model.response.pixiv
 import androidx.compose.runtime.Immutable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
 
 /**
  * Pixiv 官方 App API 搜索结果
@@ -28,6 +29,36 @@ data class ComposePixivIllustSearchResult(
 data class ComposePixivIllustDetailResult(
     @SerialName("illust")
     val illust: ComposePixivIllust? = null,
+)
+
+@Serializable
+@Immutable
+data class ComposePixivWebIllustResult(
+    @SerialName("error")
+    val error: Boolean = false,
+    @SerialName("message")
+    val message: String = "",
+    @SerialName("body")
+    val body: ComposePixivWebIllust? = null,
+)
+
+/**
+ * Pixiv 网页端作品统计。
+ * www.pixiv.net/ajax/illust/{id} 使用 camelCase 字段，而 App API 没有点赞数。
+ */
+@Serializable
+@Immutable
+data class ComposePixivWebIllust(
+    @SerialName("bookmarkCount")
+    val bookmarkCount: Int = 0,
+    @SerialName("likeCount")
+    val likeCount: Int = 0,
+    @SerialName("commentCount")
+    val commentCount: Int = 0,
+    @SerialName("responseCount")
+    val responseCount: Int = 0,
+    @SerialName("viewCount")
+    val viewCount: Int = 0,
 )
 
 /**
@@ -61,9 +92,20 @@ data class ComposePixivIllust(
     @SerialName("height")
     val height: Int = 0,
     @SerialName("total_view")
+    @JsonNames("viewCount", "view_count")
     val totalView: Int = 0,
     @SerialName("total_bookmarks")
+    @JsonNames("bookmarkCount", "bookmark_count")
     val totalBookmarks: Int = 0,
+    @SerialName("total_likes")
+    @JsonNames("likeCount", "like_count")
+    val likeCount: Int = 0,
+    @SerialName("total_comments")
+    @JsonNames("commentCount", "comment_count")
+    val commentCount: Int = 0,
+    @SerialName("total_responses")
+    @JsonNames("responseCount", "response_count")
+    val responseCount: Int = 0,
     @SerialName("is_bookmarked")
     val isBookmarked: Boolean = false,
     @SerialName("visible")

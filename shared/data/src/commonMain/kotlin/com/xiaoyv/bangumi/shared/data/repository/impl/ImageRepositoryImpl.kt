@@ -5,11 +5,11 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import com.xiaoyv.bangumi.shared.core.types.list.ListAlbumType
+import com.xiaoyv.bangumi.shared.core.utils.debugLog
+import com.xiaoyv.bangumi.shared.core.utils.fromJson
 import com.xiaoyv.bangumi.shared.core.utils.parseHtmlHexColor
 import com.xiaoyv.bangumi.shared.core.utils.runResult
 import com.xiaoyv.bangumi.shared.core.utils.toApiOffset
-import com.xiaoyv.bangumi.shared.core.utils.debugLog
-import com.xiaoyv.bangumi.shared.core.utils.fromJson
 import com.xiaoyv.bangumi.shared.data.api.client.BgmApiClient
 import com.xiaoyv.bangumi.shared.data.model.request.list.album.ListAlbumParam
 import com.xiaoyv.bangumi.shared.data.model.response.bgm.ComposeMono
@@ -18,6 +18,7 @@ import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllust
 import com.xiaoyv.bangumi.shared.data.parser.bgm.SubjectParser
 import com.xiaoyv.bangumi.shared.data.repository.CacheRepository
 import com.xiaoyv.bangumi.shared.data.repository.ImageRepository
+import com.xiaoyv.bangumi.shared.data.repository.datasource.createNetworkKeyLimitPagingPager
 import com.xiaoyv.bangumi.shared.data.repository.datasource.createNetworkPageLimitPagingPager
 import com.xiaoyv.bangumi.shared.data.repository.datasource.createPagingConfig
 import kotlinx.serialization.json.JsonArray
@@ -96,21 +97,31 @@ class ImageRepositoryImpl(
         )
     }
 
-    override fun fetchPixivPictures(tag: String): Pager<Int, ComposeGallery> {
-        return createNetworkPageLimitPagingPager(
+    override fun fetchPixivPictures(tag: String): Pager<String, ComposeGallery> {
+        return createNetworkKeyLimitPagingPager(
             pagingConfig = createPagingConfig(30),
             keySelector = { it.id },
-            onLoadData = { page ->
-                debugLog { "Pixiv search: tag=$tag, page=$page" }
+            onLoadData = { nextUrl ->
+                debugLog { "Pixiv search: tag=$tag, nextUrl=${nextUrl ?: "initial"}" }
                 try {
                     val bannedTags = readBannedTags()
-                    val result = client.pixivApi.searchIllust(
-                        word = tag,
-                        searchTarget = "partial_match_for_tags",
-                        sort = "date_desc",
-                        offset = (page - 1) * 30,
-                    )
-                    debugLog { "Pixiv search success: ${result.illusts.size} illusts, bannedTags=${bannedTags.size}" }
+                    val result = if (nextUrl == null) {
+                        client.pixivApi.searchIllust(
+                            word = tag,
+                            searchTarget = "partial_match_for_tags",
+                            sort = "date_desc",
+                        )
+                    } else {
+                        require(nextUrl.startsWith("https://app-api.pixiv.net/")) {
+                            "Unexpected Pixiv search cursor URL"
+                        }
+                        client.pixivApi.searchIllustByUrl(nextUrl)
+                    }
+                    val followingUrl = result.nextUrl?.takeIf { it.isNotBlank() && it != nextUrl }
+                    debugLog {
+                        "Pixiv search success: count=${result.illusts.size}, " +
+                            "nextUrl=$followingUrl, bannedTags=${bannedTags.size}"
+                    }
                     result.illusts
                         .filter { it.visible }
                         // 过滤命中屏蔽标签的作品（匹配日文原 tag 或翻译名）
@@ -135,7 +146,7 @@ class ImageRepositoryImpl(
                                 height = illust.height,
                                 count = illust.pageCount
                             )
-                        }
+                        } to followingUrl
                 } catch (e: Exception) {
                     debugLog { "Pixiv search error: ${e.message}" }
                     throw e
@@ -221,7 +232,22 @@ class ImageRepositoryImpl(
         runResult {
             val illust = client.pixivApi.getIllustDetail(illustId = id.toLong()).illust
                 ?: error("Illust not found: $id")
-            illust
+            val webStats = client.requestPixivApi {
+                getIllustWebDetail(illustId = id.toLong())
+            }.getOrNull()
+                ?.takeUnless { it.error }
+                ?.body
+
+            // App API 没有 likeCount，使用网页端 ajax 统计补齐；网页请求失败时保留 App API 数据。
+            webStats?.let { stats ->
+                illust.copy(
+                    totalBookmarks = stats.bookmarkCount,
+                    likeCount = stats.likeCount,
+                    commentCount = stats.commentCount,
+                    responseCount = stats.responseCount,
+                    totalView = stats.viewCount,
+                )
+            } ?: illust
         }
 
     override suspend fun fetchAnimePictureTag(data: ComposeMono): Result<List<String>> =

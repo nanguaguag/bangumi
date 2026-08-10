@@ -24,7 +24,7 @@ sealed class GalleryEvent {
         data object OnToggleWatchLater : Action()
         data object OnShare : Action()
         data object OnCopyLink : Action()
-        data object OnDownload : Action()
+        data class OnDownload(val indexes: List<Int> = emptyList()) : Action()
         data class OnTagClick(val tag: String) : Action()
 
         // ---- 评论 ----
@@ -32,6 +32,7 @@ sealed class GalleryEvent {
         data class OnCommentInputChange(val text: String) : Action()
         data class OnReplyTarget(val comment: ComposePixivComment?) : Action()
         data object OnSendComment : Action()
+        data object OnLoadMoreRelated : Action()
 
         // ---- 标签操作 ----
         data class OnBanTag(val tag: String) : Action()

@@ -37,6 +37,7 @@ import com.xiaoyv.bangumi.shared.ui.component.image.StateImage
 import com.xiaoyv.bangumi.shared.ui.component.layout.state.StateLayout
 import com.xiaoyv.bangumi.shared.ui.component.layout.state.StateLazyVerticalStaggeredGrid
 import com.xiaoyv.bangumi.shared.ui.component.navigation.Screen
+import com.xiaoyv.bangumi.shared.ui.component.navigation.pixivArtworkSharedElement
 import com.xiaoyv.bangumi.shared.ui.component.paging.LazyPagingItems
 import com.xiaoyv.bangumi.shared.ui.component.paging.collectAsLazyPagingItems
 import com.xiaoyv.bangumi.shared.ui.component.space.BrushVerticalTransparentToHalfBlack
@@ -106,9 +107,19 @@ private fun PreviewAlbumScreenContent(
                 .fillMaxWidth()
                 .aspectRatio(item.aspect),
             item = item,
+            isPixiv = state.type == ListAlbumType.PIVIX,
             onClick = {
                 if (state.type == ListAlbumType.PIVIX) {
-                    onUiEvent(PreviewAlbumEvent.UI.OnNavScreen(Screen.Gallery(item.id, item.type)))
+                    onUiEvent(
+                        PreviewAlbumEvent.UI.OnNavScreen(
+                            Screen.Gallery(
+                                id = item.id,
+                                type = item.type,
+                                transitionImage = item.image,
+                                transitionAspect = item.aspect,
+                            ),
+                        ),
+                    )
                 } else {
                     val items = pagingItems.itemSnapshotList.mapNotNull { it?.image }
                     val current = items.indexOf(item.image).coerceAtLeast(0)
@@ -125,13 +136,15 @@ private fun PreviewAlbumScreenContent(
 private fun MonoDetailPictureItem(
     modifier: Modifier,
     item: ComposeGallery,
+    isPixiv: Boolean,
     onClick: () -> Unit,
 ) {
     Box(modifier = Modifier.clickable(onClick = onClick).then(modifier)) {
         StateImage(
             modifier = Modifier
                 .matchParentSize()
-                .background(item.uiColor),
+                .background(item.uiColor)
+                .let { if (isPixiv) it.pixivArtworkSharedElement(item.id) else it },
             model = item.image,
             alignment = Alignment.TopCenter,
         )

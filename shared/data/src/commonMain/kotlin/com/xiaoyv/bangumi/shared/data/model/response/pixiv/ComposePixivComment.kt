@@ -23,8 +23,22 @@ data class ComposePixivComment(
     val user: ComposePixivUser? = null,
     @SerialName("has_replies")
     val hasReplies: Boolean = false,
+    @SerialName("stamp")
+    val stamp: ComposePixivStamp? = null,
     @SerialName("replies")
     val replies: List<ComposePixivComment> = emptyList(),
+)
+
+/**
+ * Pixiv 评论列表响应
+ */
+@Serializable
+@Immutable
+data class ComposePixivStamp(
+    @SerialName("stamp_id")
+    val id: Long = 0,
+    @SerialName("stamp_url")
+    val url: String? = null,
 )
 
 /**

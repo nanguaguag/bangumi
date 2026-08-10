@@ -4,6 +4,7 @@ import com.xiaoyv.bangumi.shared.data.api.client.cookie.BgmCookieStorage
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivComment
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivCurrentUser
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivIllust
+import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivRelatedResult
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivToken
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivUserDetailResult
 import com.xiaoyv.bangumi.shared.data.repository.PixivRepository
@@ -40,8 +41,12 @@ class PixivRepoUseCase(
         return pixivRepository.followUser(userId, isFollowed)
     }
 
-    suspend fun fetchRelatedIllusts(illustId: Long): Result<List<ComposePixivIllust>> {
+    suspend fun fetchRelatedIllusts(illustId: Long): Result<ComposePixivRelatedResult> {
         return pixivRepository.fetchRelatedIllusts(illustId)
+    }
+
+    suspend fun fetchRelatedIllusts(nextUrl: String): Result<ComposePixivRelatedResult> {
+        return pixivRepository.fetchRelatedIllusts(nextUrl)
     }
 
     suspend fun fetchIllustComments(illustId: Long): Result<List<ComposePixivComment>> {

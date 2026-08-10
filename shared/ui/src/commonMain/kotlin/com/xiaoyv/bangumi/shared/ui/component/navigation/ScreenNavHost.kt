@@ -1,8 +1,11 @@
 package com.xiaoyv.bangumi.shared.ui.component.navigation
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavBackStack
@@ -13,6 +16,7 @@ import com.xiaoyv.bangumi.shared.core.types.settings.SettingNavigationAnimation
 import com.xiaoyv.bangumi.shared.data.manager.shared.currentSettings
 import org.koin.compose.navigation3.koinEntryProvider
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun ScreenNavHost(
     navigator: Navigator,
@@ -21,27 +25,30 @@ fun ScreenNavHost(
     val settings = currentSettings()
     val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>()
 
-    NavDisplay(
-        modifier = modifier,
-        onBack = { navigator.goBack() },
-        backStack = navigator.backStack,
-        entryDecorators = listOf(
-            rememberSaveableStateHolderNavEntryDecorator(),
-            rememberViewModelStoreNavEntryDecorator()
-        ),
-        entryProvider = koinEntryProvider(),
-        sceneStrategies = listOf(listDetailStrategy),
-        transitionSpec = when (settings.ui.navigationAnimation) {
-            SettingNavigationAnimation.FADE -> FadeNavTransitions.transitionSpec
-            SettingNavigationAnimation.SLIDE -> DefaultNavTransitions.transitionSpec
-            else -> EmptyNavTransitions.transitionSpec
-        },
-        popTransitionSpec = when (settings.ui.navigationAnimation) {
-            SettingNavigationAnimation.FADE -> FadeNavTransitions.popTransitionSpec
-            SettingNavigationAnimation.SLIDE -> DefaultNavTransitions.popTransitionSpec
-            else -> EmptyNavTransitions.popTransitionSpec
+    SharedTransitionLayout(modifier = modifier) {
+        CompositionLocalProvider(LocalScreenSharedTransitionScope provides this) {
+            NavDisplay(
+                onBack = { navigator.goBack() },
+                backStack = navigator.backStack,
+                entryDecorators = listOf(
+                    rememberSaveableStateHolderNavEntryDecorator(),
+                    rememberViewModelStoreNavEntryDecorator()
+                ),
+                entryProvider = koinEntryProvider(),
+                sceneStrategies = listOf(listDetailStrategy),
+                transitionSpec = when (settings.ui.navigationAnimation) {
+                    SettingNavigationAnimation.FADE -> FadeNavTransitions.transitionSpec
+                    SettingNavigationAnimation.SLIDE -> DefaultNavTransitions.transitionSpec
+                    else -> EmptyNavTransitions.transitionSpec
+                },
+                popTransitionSpec = when (settings.ui.navigationAnimation) {
+                    SettingNavigationAnimation.FADE -> FadeNavTransitions.popTransitionSpec
+                    SettingNavigationAnimation.SLIDE -> DefaultNavTransitions.popTransitionSpec
+                    else -> EmptyNavTransitions.popTransitionSpec
+                }
+            )
         }
-    )
+    }
 }
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)

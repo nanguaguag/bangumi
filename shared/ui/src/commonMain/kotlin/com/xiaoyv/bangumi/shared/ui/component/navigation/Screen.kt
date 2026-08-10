@@ -213,7 +213,12 @@ sealed class Screen(
         Screen(SCREEN_ROUTE_MIKAN_STUDIO)
 
     @Serializable
-    data class Gallery(val id: String, val type: Int) : Screen(SCREEN_ROUTE_GALLERY)
+    data class Gallery(
+        val id: String,
+        val type: Int,
+        val transitionImage: String = "",
+        val transitionAspect: Float = 1f,
+    ) : Screen(SCREEN_ROUTE_GALLERY)
 
     @Serializable
     data class PreviewText(val text: String) : Screen(SCREEN_ROUTE_PREVIEW_TEXT)

@@ -45,7 +45,9 @@ object ImageInterceptor : Interceptor {
 
         // Pixiv image
         if (data.contains(HOST_PIXIV_IMAGE)) {
-            val newUrl = preferenceStore.settings.network.pixivImageHost + data.substringAfter(HOST_PIXIV_IMAGE).trimStart('/')
+            val path = data.substringAfter(HOST_PIXIV_IMAGE).trimStart('/')
+            val imageHost = preferenceStore.settings.network.pixivImageHost.trimEnd('/')
+            val newUrl = if (imageHost.isBlank()) data else "$imageHost/$path"
 
             return chain.withRequest(
                 chain.request

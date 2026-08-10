@@ -22,6 +22,7 @@ sealed class PixivLoginEvent {
         data object OnDismissTokenDialog : Action()
         data class OnTokenInput(val token: String) : Action()
         data object OnSubmitToken : Action()
+        data object OnDismissLoginSuccess : Action()
         data object OnLogout : Action()
     }
 }

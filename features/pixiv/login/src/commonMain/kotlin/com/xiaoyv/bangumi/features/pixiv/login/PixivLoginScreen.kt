@@ -245,6 +245,20 @@ private fun PixivLoginScreenContent(
     if (state.showTokenDialog) {
         PixivTokenLoginDialog(state, onActionEvent, uriHandler)
     }
+
+    // token 获取成功后显示欢迎弹窗，避免用户错过登录结果
+    if (state.loginSuccess && state.currentUser != null) {
+        AlertDialog(
+            onDismissRequest = { onActionEvent(PixivLoginEvent.Action.OnDismissLoginSuccess) },
+            title = { Text("欢迎！${state.currentUser.name.orEmpty()}") },
+            text = { Text("Pixiv 登录成功") },
+            confirmButton = {
+                TextButton(onClick = { onActionEvent(PixivLoginEvent.Action.OnDismissLoginSuccess) }) {
+                    Text("好的")
+                }
+            },
+        )
+    }
 }
 
 @Composable

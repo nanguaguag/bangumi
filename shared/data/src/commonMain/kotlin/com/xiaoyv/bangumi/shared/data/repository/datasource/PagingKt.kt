@@ -44,9 +44,9 @@ fun <T : Any, K> createNetworkOffsetLimitPagingPager(
     }
 )
 
-fun <T : Any, K : Any> createNetworkKeyLimitPagingPager(
+fun <T : Any, K : Any, ItemKey> createNetworkKeyLimitPagingPager(
     pagingConfig: PagingConfig,
-    keySelector: ((T) -> K)? = null,
+    keySelector: ((T) -> ItemKey)? = null,
     onLoadData: suspend (K?) -> Pair<List<T>, K?>,
 ): Pager<K, T> = Pager(
     config = pagingConfig,
@@ -88,30 +88,50 @@ class PageLimitDataSource<T : Any, K>(
     }
 }
 
-class KeyLimitDataSource<T : Any, K : Any>(
+class KeyLimitDataSource<T : Any, K : Any, ItemKey>(
     private val onLoadData: suspend (K?) -> Pair<List<T>, K?>,
-    private val keySelector: ((T) -> K)?,
+    private val keySelector: ((T) -> ItemKey)?,
 ) : PagingSource<K, T>() {
-    private val initialKey = null
-    private val seen = mutableSetOf<K>()
+    private companion object {
+        // 被本地规则过滤的连续空页不应提前终止分页，同时限制异常游标造成的请求链。
+        const val MAX_SKIPPED_EMPTY_PAGES = 10
+    }
+
+    private val seen = mutableSetOf<ItemKey>()
 
     override fun getRefreshKey(state: PagingState<K, T>) = null
 
     override suspend fun load(params: LoadParams<K>): LoadResult<K, T> {
         try {
-            val offset = params.key ?: initialKey
-            val res = onLoadData(offset)
-            val data = res.first
-            val nextKey = res.second
-            val end = nextKey == null
+            if (params is LoadParams.Refresh) seen.clear()
 
-            // 是否去重
-            val loadData = if (keySelector == null) data else data.filter { seen.add(keySelector(it)) }
-            return LoadResult.Page(
-                data = loadData,
-                prevKey = null,
-                nextKey = if (end) null else nextKey,
-            )
+            var currentKey = params.key
+            var skippedPages = 0
+
+            while (true) {
+                val (data, nextKey) = onLoadData(currentKey)
+                val loadData = if (keySelector == null) data else data.filter { seen.add(keySelector(it)) }
+
+                // 服务端 cursor 是唯一的结束条件；空的可见结果可能只是被过滤或去重。
+                if (loadData.isNotEmpty() || nextKey == null) {
+                    return LoadResult.Page(
+                        data = loadData,
+                        prevKey = null,
+                        nextKey = nextKey,
+                    )
+                }
+
+                if (nextKey == currentKey || skippedPages++ >= MAX_SKIPPED_EMPTY_PAGES) {
+                    debugLog { "Paging cursor stalled after skipped empty pages: key=$currentKey, next=$nextKey" }
+                    return LoadResult.Page(
+                        data = emptyList(),
+                        prevKey = null,
+                        nextKey = null,
+                    )
+                }
+
+                currentKey = nextKey
+            }
         } catch (e: Exception) {
             return LoadResult.Error(e)
         }
