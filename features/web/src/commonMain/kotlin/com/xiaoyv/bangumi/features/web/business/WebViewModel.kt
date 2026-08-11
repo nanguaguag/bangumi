@@ -82,10 +82,7 @@ class WebViewModel(
                             postEffect { WebSideEffect.OnReload }
                         }
                         .onSuccess {
-                            debugLog {
-                                "PixivUser:$it"
-                            }
-
+                            debugLog { "Pixiv OAuth exchange succeeded" }
                             postEffect { WebSideEffect.OnNavUp }
                         }
                 }

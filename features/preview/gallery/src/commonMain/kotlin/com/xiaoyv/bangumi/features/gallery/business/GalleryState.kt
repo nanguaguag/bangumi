@@ -8,6 +8,8 @@ import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivUserDetai
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+const val MAX_PIXIV_COMMENT_LENGTH = 140
+
 /**
  * [GalleryState]
  *
@@ -32,6 +34,7 @@ data class GalleryState(
     @SerialName("commentsLoading") val commentsLoading: Boolean = false,
     @SerialName("expandedReplyIds") val expandedReplyIds: Set<Long> = emptySet(),
     @SerialName("commentInput") val commentInput: String = "",
+    @SerialName("isSendingComment") val isSendingComment: Boolean = false,
     @SerialName("replyTarget") val replyTarget: ComposePixivComment? = null,
 
     // ---- 相关图片 ----

@@ -76,7 +76,7 @@ class PixivRepositoryImpl(
             ).let { it.copy(expiresAt = System.currentTimeMillis() + it.expiresIn * 1000) }
         }
         result.onSuccess {
-            debugLog { "Pixiv loginWithRefreshToken SUCCESS: access_token=${it.accessToken.take(8)}..., refresh_token=${it.refreshToken.take(8)}..." }
+            debugLog { "Pixiv loginWithRefreshToken succeeded" }
             preferenceStore.pixivToken = it
             debugLog { "Pixiv loginWithRefreshToken: token saved to preferenceStore" }
         }.onFailure {
@@ -88,7 +88,7 @@ class PixivRepositoryImpl(
     override suspend fun fetchCurrentUser(): Result<ComposePixivCurrentUser> {
         debugLog { "Pixiv fetchCurrentUser: calling /v1/user/me/state" }
         val token = preferenceStore.pixivToken
-        debugLog { "Pixiv fetchCurrentUser: current access_token=${token.accessToken.take(8)}..., isBlank=${token.accessToken.isBlank()}" }
+        debugLog { "Pixiv fetchCurrentUser: tokenPresent=${token.accessToken.isNotBlank()}" }
 
         // /v1/user/me/state 返回基本 profile（不含 account/comment）
         // 直接调用 api 以便捕获响应体

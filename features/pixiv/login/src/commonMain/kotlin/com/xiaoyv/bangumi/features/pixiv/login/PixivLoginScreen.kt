@@ -52,7 +52,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -101,8 +100,6 @@ import com.xiaoyv.bangumi.features.pixiv.login.business.PixivLoginSideEffect
 import com.xiaoyv.bangumi.features.pixiv.login.business.PixivLoginState
 import com.xiaoyv.bangumi.features.pixiv.login.business.PixivLoginViewModel
 import com.xiaoyv.bangumi.shared.core.mvi.BaseState
-import com.xiaoyv.bangumi.shared.core.utils.debugLog
-import com.xiaoyv.bangumi.shared.data.repository.PixivRepository
 import com.xiaoyv.bangumi.shared.ui.component.bar.BgmTopAppBar
 import com.xiaoyv.bangumi.shared.ui.component.dialog.alert.BgmAlertDialog
 import com.xiaoyv.bangumi.shared.ui.component.dialog.alert.rememberAlertDialogState
@@ -110,10 +107,7 @@ import com.xiaoyv.bangumi.shared.ui.component.layout.state.StateLayout
 import com.xiaoyv.bangumi.shared.ui.component.navigation.Screen
 import com.xiaoyv.bangumi.shared.ui.kts.collectBaseSideEffect
 import com.xiaoyv.bangumi.shared.ui.theme.BgmIcons
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.koinInject
-import org.koin.compose.viewmodel.koinViewModel
 import org.orbitmvi.orbit.compose.collectAsState
 
 @Composable
@@ -123,6 +117,7 @@ fun PixivLoginRoute(
     onNavScreen: (Screen) -> Unit,
 ) {
     val baseState by viewModel.collectAsState()
+    val uriHandler = LocalUriHandler.current
 
     // 每次进入页面时检查登录状态（处理浏览器登录后返回的情况）
     LaunchedEffect(Unit) {
@@ -132,6 +127,8 @@ fun PixivLoginRoute(
     viewModel.collectBaseSideEffect {
         when (it) {
             is PixivLoginSideEffect.OnNavUp -> onNavUp()
+            is PixivLoginSideEffect.OnNavScreen -> onNavScreen(it.screen)
+            is PixivLoginSideEffect.OpenExternalUrl -> uriHandler.openUri(it.url)
             is PixivLoginSideEffect.OnToast -> {
                 // Toast handled by BaseViewModel
             }
@@ -173,7 +170,7 @@ private fun PixivLoginScreen(
             onRefresh = { onActionEvent(PixivLoginEvent.Action.OnRefresh(it)) },
             baseState = baseState,
         ) { state ->
-            PixivLoginScreenContent(state, onUiEvent, onActionEvent)
+            PixivLoginScreenContent(state, onActionEvent)
         }
     }
 }
@@ -182,12 +179,9 @@ private fun PixivLoginScreen(
 @Composable
 private fun PixivLoginScreenContent(
     state: PixivLoginState,
-    onUiEvent: (PixivLoginEvent.UI) -> Unit,
     onActionEvent: (PixivLoginEvent.Action) -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
-    val repo = koinInject<PixivRepository>()
-    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -237,7 +231,7 @@ private fun PixivLoginScreenContent(
             PixivLoggedInContent(state, onActionEvent, uriHandler)
         } else {
             // 未登录状态 - 显示登录向导
-            PixivLoginGuideContent(state, onUiEvent, onActionEvent, repo, uriHandler, scope)
+            PixivLoginGuideContent(state, onActionEvent)
         }
     }
 
@@ -264,11 +258,7 @@ private fun PixivLoginScreenContent(
 @Composable
 private fun PixivLoginGuideContent(
     state: PixivLoginState,
-    onUiEvent: (PixivLoginEvent.UI) -> Unit,
     onActionEvent: (PixivLoginEvent.Action) -> Unit,
-    repo: PixivRepository,
-    uriHandler: androidx.compose.ui.platform.UriHandler,
-    scope: kotlinx.coroutines.CoroutineScope,
 ) {
     // 未登录状态提示
     Card(
@@ -331,15 +321,7 @@ private fun PixivLoginGuideContent(
         enabled = !state.isLoggingIn,
         shape = RoundedCornerShape(14.dp),
         onClick = {
-            scope.launch {
-                val login = repo.fetchLoginChallenge().getOrThrow()
-                val challenge = login.codeChallenge
-                val loginUrl = "https://app-api.pixiv.net/web/v1/login?code_challenge=" +
-                    challenge +
-                    "&code_challenge_method=S256&client=pixiv-android&source=pixiv-android"
-                debugLog { "PixivLoginUrl: $loginUrl" }
-                onUiEvent(PixivLoginEvent.UI.OnNavScreen(Screen.Web(loginUrl)))
-            }
+            onActionEvent(PixivLoginEvent.Action.OnWebViewLogin)
         }
     ) {
         if (state.isLoggingIn) {
@@ -367,14 +349,7 @@ private fun PixivLoginGuideContent(
         enabled = !state.isLoggingIn,
         shape = RoundedCornerShape(14.dp),
         onClick = {
-            scope.launch {
-                val login = repo.fetchLoginChallenge().getOrThrow()
-                val challenge = login.codeChallenge
-                val loginUrl = "https://app-api.pixiv.net/web/v1/login?code_challenge=" +
-                    challenge +
-                    "&code_challenge_method=S256&client=pixiv-android&source=pixiv-android"
-                uriHandler.openUri(loginUrl)
-            }
+            onActionEvent(PixivLoginEvent.Action.OnBrowserLogin)
         }
     ) {
         Icon(

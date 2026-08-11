@@ -10,6 +10,8 @@ import com.xiaoyv.bangumi.shared.data.repository.DatabaseRepository
 import com.xiaoyv.bangumi.shared.data.repository.boolean
 import com.xiaoyv.bangumi.shared.data.repository.serializable
 import com.xiaoyv.bangumi.shared.data.repository.string
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * 本地SP数据缓存，禁止UI模块直接调用，需要在 common层委托读写
@@ -42,7 +44,29 @@ class PreferenceStore(
     /**
      * 用户登录的 Pixiv-Token 数据
      */
-    var pixivToken by cacheRepository.serializable(SpKey.KEY_USER_PIXIV_TOKEN, ComposePixivToken.Empty)
+    private var storedPixivToken by cacheRepository.serializable(
+        SpKey.KEY_USER_PIXIV_TOKEN,
+        ComposePixivToken.Empty,
+    )
+    private val _pixivToken = MutableStateFlow(storedPixivToken)
+    val pixivTokenFlow = _pixivToken.asStateFlow()
+
+    /** 外部 OAuth 回调的短生命周期错误，不写入持久化存储。 */
+    private val _pixivAuthError = MutableStateFlow<String?>(null)
+    val pixivAuthErrorFlow = _pixivAuthError.asStateFlow()
+
+    var pixivAuthError: String?
+        get() = _pixivAuthError.value
+        set(value) {
+            _pixivAuthError.value = value
+        }
+
+    var pixivToken: ComposePixivToken
+        get() = storedPixivToken
+        set(value) {
+            storedPixivToken = value
+            _pixivToken.value = value
+        }
 
     /**
      * APP 设置

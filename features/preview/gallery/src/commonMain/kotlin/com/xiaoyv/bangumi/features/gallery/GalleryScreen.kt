@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -121,6 +122,7 @@ import com.xiaoyv.bangumi.core_resource.resources.reply_comment_send
 import com.xiaoyv.bangumi.features.gallery.business.GalleryEvent
 import com.xiaoyv.bangumi.features.gallery.business.GallerySideEffect
 import com.xiaoyv.bangumi.features.gallery.business.GalleryState
+import com.xiaoyv.bangumi.features.gallery.business.MAX_PIXIV_COMMENT_LENGTH
 import com.xiaoyv.bangumi.features.gallery.business.GalleryViewModel
 import com.xiaoyv.bangumi.shared.core.mvi.BaseState
 import com.xiaoyv.bangumi.shared.core.types.list.ListAlbumType
@@ -223,14 +225,22 @@ private fun GalleryScreen(
             val current = state
             if (current?.isPixiv == true && current.illust != null) {
                 ExtendedFloatingActionButton(
-                    onClick = { onActionEvent(GalleryEvent.Action.OnToggleBookmark) },
+                    onClick = {
+                        if (!current.isLoadingAction) {
+                            onActionEvent(GalleryEvent.Action.OnToggleBookmark)
+                        }
+                    },
                     containerColor = if (current.isBookmarked) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.primaryContainer,
                     icon = {
-                        Icon(
-                            imageVector = if (current.isBookmarked) BgmIcons.Bookmark else BgmIcons.BookmarkBorder,
-                            contentDescription = null,
-                        )
+                        if (current.isLoadingAction) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(
+                                imageVector = if (current.isBookmarked) BgmIcons.Bookmark else BgmIcons.BookmarkBorder,
+                                contentDescription = null,
+                            )
+                        }
                     },
                     text = {
                         Text(
@@ -453,14 +463,11 @@ private fun PixivGalleryContent(
             Spacer(modifier = Modifier.height(48.dp))
         }
 
-        // 没有评论时不占用作品页空间；发表评论后 ViewModel 会立即插入新评论并显示
-        if (state.comments.isNotEmpty()) {
-            item(key = "comments") {
-                CommentsSection(
-                    state = state,
-                    onActionEvent = onActionEvent,
-                )
-            }
+        item(key = "comments") {
+            CommentsSection(
+                state = state,
+                onActionEvent = onActionEvent,
+            )
         }
 
         if (state.relatedIllusts.isNotEmpty() || state.relatedLoading) {
@@ -536,13 +543,13 @@ private fun PixivGalleryContent(
                         modifier = Modifier.heightIn(max = 380.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        items(state.images.chunked(2)) { rowItems ->
+                        items(state.images.chunked(2).withIndex().toList()) { (rowIndex, rowItems) ->
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                rowItems.forEachIndexed { rowIndex, image ->
-                                    val index = state.images.indexOf(image)
+                                rowItems.forEachIndexed { columnIndex, image ->
+                                    val index = rowIndex * 2 + columnIndex
                                     val checked = index in selectedIndexes
                                     Box(
                                         modifier = Modifier
@@ -645,6 +652,7 @@ private fun IllustDetailSection(
             AuthorCard(
                 user = user,
                 isFollowed = state.isFollowed,
+                isLoadingAction = state.isLoadingAction,
                 onToggleFollow = { onActionEvent(GalleryEvent.Action.OnToggleFollow) },
             )
         }
@@ -683,6 +691,7 @@ private fun IllustDetailSection(
 private fun AuthorCard(
     user: ComposePixivUser,
     isFollowed: Boolean,
+    isLoadingAction: Boolean,
     onToggleFollow: () -> Unit,
 ) {
     Card(
@@ -732,16 +741,23 @@ private fun AuthorCard(
                 }
             }
             // 关注按钮
-            IconButton(onClick = onToggleFollow) {
-                Icon(
-                    imageVector = if (isFollowed) BgmIcons.Favorite else BgmIcons.FavoriteBorder,
-                    contentDescription = if (isFollowed)
-                        stringResource(Res.string.pixiv_unfollow)
-                    else
-                        stringResource(Res.string.pixiv_follow),
-                    tint = if (isFollowed) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            IconButton(
+                onClick = onToggleFollow,
+                enabled = !isLoadingAction,
+            ) {
+                if (isLoadingAction) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(
+                        imageVector = if (isFollowed) BgmIcons.Favorite else BgmIcons.FavoriteBorder,
+                        contentDescription = if (isFollowed)
+                            stringResource(Res.string.pixiv_unfollow)
+                        else
+                            stringResource(Res.string.pixiv_follow),
+                        tint = if (isFollowed) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
@@ -1353,22 +1369,35 @@ private fun CommentInputBar(
             ) {
                 TextField(
                     value = state.commentInput,
-                    onValueChange = { onActionEvent(GalleryEvent.Action.OnCommentInputChange(it)) },
+                    onValueChange = {
+                        onActionEvent(
+                            GalleryEvent.Action.OnCommentInputChange(
+                                it.take(MAX_PIXIV_COMMENT_LENGTH)
+                            )
+                        )
+                    },
                     modifier = Modifier.weight(1f),
                     placeholder = { Text(stringResource(Res.string.reply_comment_hint)) },
+                    supportingText = {
+                        Text("${state.commentInput.length}/$MAX_PIXIV_COMMENT_LENGTH")
+                    },
                     maxLines = 4,
                     textStyle = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 IconButton(
                     onClick = { onActionEvent(GalleryEvent.Action.OnSendComment) },
-                    enabled = state.commentInput.isNotBlank(),
+                    enabled = state.commentInput.isNotBlank() && !state.isSendingComment,
                 ) {
-                    Icon(
-                        imageVector = BgmIcons.Send,
-                        contentDescription = stringResource(Res.string.reply_comment_send),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
+                    if (state.isSendingComment) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(
+                            imageVector = BgmIcons.Send,
+                            contentDescription = stringResource(Res.string.reply_comment_send),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
         }
@@ -1403,26 +1432,36 @@ private fun RelatedIllustsSection(
             }
         }
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            relatedIllusts.forEach { illust ->
-                Box(
-                    modifier = Modifier
-                        .size(120.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable {
-                            onNavScreen(Screen.Gallery(illust.id.toString(), ListAlbumType.PIVIX))
-                        },
-                ) {
-                    StateImage(
-                        modifier = Modifier.fillMaxSize(),
-                        model = illust.imageUrls?.squareMedium,
-                        contentDescription = illust.title,
-                        contentScale = ContentScale.Crop,
-                    )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val spacing = 8.dp
+            val minItemWidth = 104.dp
+            val columnCount = ((maxWidth + spacing) / (minItemWidth + spacing))
+                .toInt()
+                .coerceAtLeast(2)
+            val itemWidth = (maxWidth - spacing * (columnCount - 1).toFloat()) / columnCount
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(spacing),
+                verticalArrangement = Arrangement.spacedBy(spacing),
+            ) {
+                relatedIllusts.forEach { illust ->
+                    Box(
+                        modifier = Modifier
+                            .width(itemWidth)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                onNavScreen(Screen.Gallery(illust.id.toString(), ListAlbumType.PIVIX))
+                            },
+                    ) {
+                        StateImage(
+                            modifier = Modifier.fillMaxSize(),
+                            model = illust.imageUrls?.squareMedium,
+                            contentDescription = illust.title,
+                            contentScale = ContentScale.Crop,
+                        )
+                    }
                 }
             }
         }

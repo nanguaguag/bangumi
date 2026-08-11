@@ -1,6 +1,8 @@
 package com.xiaoyv.bangumi.features.pixiv.login.business
 
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.viewModelScope
+import com.xiaoyv.bangumi.shared.core.exception.ApiHttpException
 import com.xiaoyv.bangumi.shared.core.mvi.BaseSyntax
 import com.xiaoyv.bangumi.shared.core.mvi.BaseViewModel
 import com.xiaoyv.bangumi.shared.core.utils.debugLog
@@ -8,7 +10,13 @@ import com.xiaoyv.bangumi.shared.core.utils.errMsg
 import com.xiaoyv.bangumi.shared.data.manager.app.PreferenceStore
 import com.xiaoyv.bangumi.shared.data.model.response.pixiv.ComposePixivToken
 import com.xiaoyv.bangumi.shared.data.usecase.PixivRepoUseCase
-
+import com.xiaoyv.bangumi.shared.ui.component.navigation.Screen
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 /**
  * [PixivLoginViewModel]
  *
@@ -21,14 +29,39 @@ class PixivLoginViewModel(
     private val preferenceStore: PreferenceStore,
 ) : BaseViewModel<PixivLoginState, PixivLoginSideEffect, PixivLoginEvent.Action>(savedStateHandle) {
 
+    init {
+        preferenceStore.pixivTokenFlow
+            .map { it.accessToken.isNotBlank() }
+            .distinctUntilChanged()
+            .drop(1)
+            .onEach { refresh(loading = false) }
+            .launchIn(viewModelScope)
+
+        preferenceStore.pixivAuthErrorFlow
+            .filterNotNull()
+            .onEach { message ->
+                preferenceStore.pixivAuthError = null
+                action { postToast { message } }
+            }
+            .launchIn(viewModelScope)
+    }
+
     /**
      * 同步检测 token 避免闪白：initSate 直接读取 preferenceStore 设置 isLoggedIn
      */
     override fun initSate(onCreate: Boolean): PixivLoginState {
         val token = preferenceStore.pixivToken
         val isLoggedIn = token.accessToken.isNotBlank()
-        debugLog { "PixivLogin initSate: accessToken=${token.accessToken.take(8)}, isBlank=${token.accessToken.isBlank()}, isLoggedIn=$isLoggedIn" }
+        debugLog { "PixivLogin initSate: tokenPresent=${token.accessToken.isNotBlank()}, isLoggedIn=$isLoggedIn" }
         return PixivLoginState(isLoggedIn = isLoggedIn)
+    }
+
+    private fun isPixivAuthFailure(error: Throwable): Boolean {
+        val httpError = error as? ApiHttpException ?: return false
+        val body = httpError.bodyAsText.lowercase()
+        return httpError.code == 401 ||
+            (httpError.code == 400 && listOf("oauth", "invalid_grant", "invalid_request", "expired")
+                .any(body::contains))
     }
 
     override suspend fun BaseSyntax<PixivLoginState, PixivLoginSideEffect>.refreshSync() {
@@ -52,9 +85,22 @@ class PixivLoginViewModel(
                     }
                     loadUserProfile(user.id)
                 }
-                .onFailure {
-                    debugLog { "PixivLogin refreshSync: fetchCurrentUser FAILED=${it.message}" }
-                    reduceContent { state.copy(isLoggedIn = true, isLoggingIn = false) }
+                .onFailure { error ->
+                    debugLog { "PixivLogin refreshSync: fetchCurrentUser FAILED=${error.message}" }
+                    if (isPixivAuthFailure(error)) {
+                        preferenceStore.pixivToken = ComposePixivToken.Empty
+                        reduceContent {
+                            state.copy(
+                                isLoggedIn = false,
+                                isLoggingIn = false,
+                                currentUser = null,
+                                userProfile = null,
+                            )
+                        }
+                    } else {
+                        // 网络暂时不可用时保留登录状态，但不伪造用户资料。
+                        reduceContent { state.copy(isLoggedIn = true, isLoggingIn = false) }
+                    }
                 }
         } else {
             debugLog { "PixivLogin refreshSync: not logged in" }
@@ -91,12 +137,36 @@ class PixivLoginViewModel(
     }
 
     private fun onWebViewLogin() = action {
-        reduceContent { state.copy(isLoggingIn = true) }
+        val loginUrl = prepareLoginUrl() ?: return@action
         reduceContent { state.copy(isLoggingIn = false) }
+        postEffect { PixivLoginSideEffect.OnNavScreen(Screen.Web(loginUrl)) }
     }
 
     private fun onBrowserLogin() = action {
-        // Opens in external browser
+        val loginUrl = prepareLoginUrl() ?: return@action
+        reduceContent { state.copy(isLoggingIn = false) }
+        postEffect { PixivLoginSideEffect.OpenExternalUrl(loginUrl) }
+    }
+
+    private suspend fun BaseSyntax<PixivLoginState, PixivLoginSideEffect>.prepareLoginUrl(): String? {
+        if (stateRaw.isLoggingIn) return null
+        reduceContent { state.copy(isLoggingIn = true) }
+
+        val result = pixivRepoUseCase.fetchLoginChallenge()
+        val challenge = result.getOrNull()
+        if (challenge == null) {
+            reduceContent { state.copy(isLoggingIn = false) }
+            postToast {
+                result.exceptionOrNull()?.errMsg
+                    ?.ifBlank { "Pixiv 登录初始化失败，请重试" }
+                    ?: "Pixiv 登录初始化失败，请重试"
+            }
+            return null
+        }
+
+        return "https://app-api.pixiv.net/web/v1/login" +
+            "?code_challenge=${challenge.codeChallenge}" +
+            "&code_challenge_method=S256&client=pixiv-android&source=pixiv-android"
     }
 
     private fun onShowTokenDialog() = action {

@@ -103,7 +103,9 @@ private suspend fun buildProxyCookieHeader(
         }
     }
 
-    cookieMap.putIfAbsent("kira", "4")
+    if ("kira" !in cookieMap) {
+        cookieMap["kira"] = "4"
+    }
 
     return cookieMap.entries.joinToString("; ") { "${it.key}=${it.value}" }
 }

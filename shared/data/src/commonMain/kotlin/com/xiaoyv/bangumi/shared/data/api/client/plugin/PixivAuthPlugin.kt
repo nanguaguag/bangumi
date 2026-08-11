@@ -56,13 +56,12 @@ val PixivAuthPlugin: ClientPlugin<PixivAuthConfig> =
     createClientPlugin("PixivAuthPlugin", ::PixivAuthConfig) {
         val preferenceStore = pluginConfig.preferenceStore
         val refreshBlock = pluginConfig.refreshBlock
-        var lastRefreshedToken: ComposePixivToken? = null
 
         onRequest { request, _ ->
             // OAuth token 端点不需要 Bearer
             if (request.url.host.contains("oauth.secure.pixiv.net")) return@onRequest
 
-            val token = lastRefreshedToken ?: preferenceStore?.pixivToken
+            val token = preferenceStore?.pixivToken
             val accessToken = token?.accessToken.orEmpty()
             if (accessToken.isNotBlank()) {
                 // 使用 set 运算符（替换而非追加），避免重复 Authorization 头
@@ -84,7 +83,6 @@ val PixivAuthPlugin: ClientPlugin<PixivAuthConfig> =
             if (hasExpired && stored.refreshToken.isNotBlank()) {
                 debugLog { "PixivAuthPlugin: access_token expired (expiresAt=${stored.expiresAt}), refreshing before request" }
                 currentToken = refreshPixivToken(preferenceStore, refreshBlock, stored) ?: stored
-                lastRefreshedToken = currentToken
             }
 
             // 预检刷新成功后，重建请求以携带新 token（takeFrom 会复制旧 Authorization，需用 set 覆盖）
@@ -110,8 +108,6 @@ val PixivAuthPlugin: ClientPlugin<PixivAuthConfig> =
             debugLog { "PixivAuthPlugin: HTTP ${origin.response.status.value} OAuth error, refreshing token and retrying once" }
             val newToken = refreshPixivToken(preferenceStore, refreshBlock, stored)
                 ?: throw ApiHttpException(origin.response.status.value, body)
-            lastRefreshedToken = newToken
-
             val retryRequest = HttpRequestBuilder().takeFromWithExecutionContext(originalRequest).apply {
                 headers[HttpHeaders.Authorization] = "Bearer ${newToken.accessToken}"
             }
@@ -164,7 +160,7 @@ private suspend fun refreshPixivToken(
             preferenceStore.pixivToken = refreshed.copy(
                 expiresAt = System.currentTimeMillis() + refreshed.expiresIn * 1000
             )
-            debugLog { "PixivAuthPlugin: refresh SUCCESS, new access_token=${refreshed.accessToken.take(8)}..., expiresAt=${preferenceStore.pixivToken.expiresAt}" }
+            debugLog { "PixivAuthPlugin: refresh succeeded, expiresAt=${preferenceStore.pixivToken.expiresAt}" }
         } else {
             debugLog { "PixivAuthPlugin: refresh FAILED (null result)" }
         }

@@ -8,7 +8,14 @@ import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import kotlin.coroutines.CoroutineContext
 
-val systemDevice by lazy { SystemDevice() }
+internal fun requireSafeDownloadSubDir(subDir: String) {
+    require(
+        subDir.isNotBlank() &&
+            subDir != "." &&
+            subDir != ".." &&
+            subDir.none { it == '/' || it == '\\' || it.code < 0x20 }
+    ) { "Invalid download directory" }
+}
 
 expect object System {
     val isDebugType: Boolean

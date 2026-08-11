@@ -289,7 +289,8 @@ class BgmApiClient(
 
             install(Logging) {
                 format = LoggingFormat.Default
-                level = LogLevel.ALL
+                // INFO 仅记录请求方法、URL 和状态，避免输出 Authorization 及 OAuth 请求体。
+                level = LogLevel.INFO
                 logger = object : Logger {
                     override fun log(message: String) {
                         debugLog { "PixivHTTP: $message" }
@@ -391,7 +392,7 @@ class BgmApiClient(
         require(tokenEntity.accessToken.isNotBlank())
         require(tokenEntity.refreshToken.isNotBlank())
 
-        debugLog { "AuthToken ：${tokenEntity}" }
+        debugLog { "BGM authorization token created" }
 
         tokenEntity
     }

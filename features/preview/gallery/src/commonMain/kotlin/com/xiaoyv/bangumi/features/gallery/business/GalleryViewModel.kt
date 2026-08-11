@@ -11,7 +11,6 @@ import com.xiaoyv.bangumi.shared.System
 import com.xiaoyv.bangumi.shared.core.mvi.BaseSyntax
 import com.xiaoyv.bangumi.shared.core.mvi.BaseViewModel
 import com.xiaoyv.bangumi.shared.core.types.list.ListAlbumType
-import com.xiaoyv.bangumi.shared.core.utils.awaitAll
 import com.xiaoyv.bangumi.shared.core.utils.debugLog
 import com.xiaoyv.bangumi.shared.core.utils.defaultJson
 import com.xiaoyv.bangumi.shared.core.utils.errMsg
@@ -25,6 +24,8 @@ import com.xiaoyv.bangumi.shared.data.repository.writeViewModelCache
 import com.xiaoyv.bangumi.shared.data.usecase.ImageRepoUseCase
 import com.xiaoyv.bangumi.shared.data.usecase.PixivRepoUseCase
 import com.xiaoyv.bangumi.shared.ui.component.navigation.Screen
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import org.jetbrains.compose.resources.getString
@@ -122,34 +123,45 @@ class GalleryViewModel(
                     debugLog { "Failed to load pixiv illust detail: ${it.message}" }
                 }
 
-            // 并行加载评论与相关图片
+            // 评论与相关作品相互独立：其中一个接口失败时，仍展示另一个成功结果。
             reduceContent { state.copy(commentsLoading = true, relatedLoading = true) }
-            awaitAll(
-                block1 = { pixivRepoUseCase.fetchIllustComments(args.id.toLongOrNull() ?: 0L) },
-                block2 = { pixivRepoUseCase.fetchRelatedIllusts(args.id.toLongOrNull() ?: 0L) },
-            ).onSuccess {
-                val relatedPage = it.data2
-                val nextUrl = relatedPage.nextUrl?.takeIf { it.isNotBlank() }
-                debugLog {
-                    "Pixiv related initial: count=${relatedPage.illusts.size}, nextUrl=$nextUrl"
+            supervisorScope {
+                launch {
+                    runCatching {
+                        pixivRepoUseCase.fetchIllustComments(args.id.toLongOrNull() ?: 0L)
+                    }.getOrElse { Result.failure(it) }
+                        .onSuccess { value ->
+                            reduceContent {
+                                state.copy(comments = value, commentsLoading = false)
+                            }
+                        }
+                        .onFailure { error ->
+                            debugLog { "Failed to load Pixiv comments: ${error.message}" }
+                            reduceContent { state.copy(commentsLoading = false) }
+                        }
                 }
-                reduceContent {
-                    state.copy(
-                        comments = it.data1,
-                        relatedIllusts = relatedPage.illusts,
-                        commentsLoading = false,
-                        relatedLoading = false,
-                        relatedHasMore = nextUrl != null,
-                        relatedNextUrl = nextUrl,
-                    )
-                }
-            }.onFailure {
-                debugLog { "Failed to load Pixiv related illusts: ${it.message}" }
-                reduceContent {
-                    state.copy(
-                        commentsLoading = false,
-                        relatedLoading = false,
-                    )
+                launch {
+                    runCatching {
+                        pixivRepoUseCase.fetchRelatedIllusts(args.id.toLongOrNull() ?: 0L)
+                    }.getOrElse { Result.failure(it) }
+                        .onSuccess { relatedPage ->
+                            val nextUrl = relatedPage.nextUrl?.takeIf { it.isNotBlank() }
+                            debugLog {
+                                "Pixiv related initial: count=${relatedPage.illusts.size}, nextUrl=$nextUrl"
+                            }
+                            reduceContent {
+                                state.copy(
+                                    relatedIllusts = relatedPage.illusts,
+                                    relatedLoading = false,
+                                    relatedHasMore = nextUrl != null,
+                                    relatedNextUrl = nextUrl,
+                                )
+                            }
+                        }
+                        .onFailure { error ->
+                            debugLog { "Failed to load Pixiv related illusts: ${error.message}" }
+                            reduceContent { state.copy(relatedLoading = false) }
+                        }
                 }
             }
         }
@@ -193,6 +205,7 @@ class GalleryViewModel(
 
     private fun onToggleBookmark() = action {
         val currentState = stateRaw
+        if (currentState.isLoadingAction) return@action
         val illust = currentState.illust ?: return@action
         val newBookmarked = !currentState.isBookmarked
         reduceContent { state.copy(isLoadingAction = true) }
@@ -209,6 +222,7 @@ class GalleryViewModel(
 
     private fun onToggleFollow() = action {
         val currentState = stateRaw
+        if (currentState.isLoadingAction) return@action
         val illust = currentState.illust ?: return@action
         val userId = illust.user?.id ?: return@action
         val newFollowed = !currentState.isFollowed
@@ -383,7 +397,9 @@ class GalleryViewModel(
     }
 
     private fun onCommentInputChange(text: String) = action {
-        reduceContent { state.copy(commentInput = text) }
+        reduceContent {
+            state.copy(commentInput = text.take(MAX_PIXIV_COMMENT_LENGTH))
+        }
     }
 
     private fun onReplyTarget(comment: ComposePixivComment?) = action {
@@ -395,14 +411,23 @@ class GalleryViewModel(
      */
     private fun onSendComment() = action {
         val currentState = stateRaw
+        if (currentState.isSendingComment) return@action
         val text = currentState.commentInput.trim()
         if (text.isBlank()) return@action
+        if (text.length > MAX_PIXIV_COMMENT_LENGTH) {
+            postToast { "评论最多 $MAX_PIXIV_COMMENT_LENGTH 个字符" }
+            return@action
+        }
         val illustId = currentState.id.toLongOrNull() ?: return@action
         val parent = currentState.replyTarget
+        reduceContent { state.copy(isSendingComment = true) }
 
-        withActionLoading {
+        val result = withActionLoading(showError = false) {
             pixivRepoUseCase.addIllustComment(illustId, text, parent?.id)
-        }.onSuccess { newComment ->
+        }
+        reduceContent { state.copy(isSendingComment = false) }
+
+        result.onSuccess { newComment ->
             if (newComment != null) {
                 reduceContent {
                     state.copy(

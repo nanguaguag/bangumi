@@ -31,7 +31,7 @@ class SettingsMainViewModel(
     override fun initSate(onCreate: Boolean): SettingsMainState {
         val token = preferenceStore.pixivToken
         val isLoggedIn = token.accessToken.isNotBlank()
-        debugLog { "SettingsMain initSate: accessToken=${token.accessToken.take(8)}, isBlank=${token.accessToken.isBlank()}, pixivLoggedIn=$isLoggedIn" }
+        debugLog { "SettingsMain initSate: tokenPresent=${token.accessToken.isNotBlank()}, pixivLoggedIn=$isLoggedIn" }
         return SettingsMainState(
             pixivLoggedIn = isLoggedIn,
             pixivDownloadDir = userManager.pixivDownloadDir,
@@ -86,7 +86,11 @@ class SettingsMainViewModel(
 
     private fun onUpdatePixivDownloadDir(dir: String) = action {
         val newDir = dir.trim().trim('/')
-        if (newDir.isBlank()) {
+        val invalid = newDir.isBlank() ||
+            newDir == "." ||
+            newDir == ".." ||
+            newDir.any { it == '/' || it == '\\' || it.code < 0x20 }
+        if (invalid) {
             postToast { getString(Res.string.pixiv_download_dir_invalid) }
             return@action
         }

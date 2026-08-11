@@ -20,7 +20,9 @@ import io.ktor.http.HttpHeaders
 import java.io.File
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 
 /**
  * 下载专用 HttpClient（带超时与重定向）
@@ -46,7 +48,7 @@ internal object ActivityHolder {
     fun ensureInit(context: Context) {
         if (initialized) return
         initialized = true
-        (context as? Application)?.registerActivityLifecycleCallbacks(
+        (context.applicationContext as? Application)?.registerActivityLifecycleCallbacks(
             object : Application.ActivityLifecycleCallbacks {
                 override fun onActivityResumed(activity: Activity) {
                     resumedActivity = activity
@@ -59,10 +61,22 @@ internal object ActivityHolder {
                 override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
                 override fun onActivityStarted(activity: Activity) = Unit
                 override fun onActivityStopped(activity: Activity) = Unit
-                override fun onActivityDestroyed(activity: Activity) = Unit
+                override fun onActivityDestroyed(activity: Activity) {
+                    if (resumedActivity === activity) resumedActivity = null
+                    StoragePermissionBridge.onActivityDestroyed(activity)
+                }
+
                 override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
             }
         )
+    }
+
+    fun setCurrent(activity: Activity) {
+        resumedActivity = activity
+    }
+
+    fun clearCurrent(activity: Activity) {
+        if (resumedActivity === activity) resumedActivity = null
     }
 
     fun current(): Activity? = resumedActivity
@@ -74,26 +88,51 @@ internal object ActivityHolder {
 object StoragePermissionBridge {
     private const val REQUEST_CODE_WRITE_STORAGE = 0x2D01
     private var pendingContinuation: Continuation<Boolean>? = null
+    private var pendingActivity: Activity? = null
+
+    /** 在 Activity 创建时调用，避免首次下载发生在注册生命周期回调之前。 */
+    fun initialize(activity: Activity) {
+        ActivityHolder.ensureInit(activity)
+        ActivityHolder.setCurrent(activity)
+    }
 
     fun onRequestPermissionsResult(requestCode: Int, grantResults: IntArray) {
         if (requestCode != REQUEST_CODE_WRITE_STORAGE) return
-        val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
-        pendingContinuation?.resume(granted)
+        val continuation = pendingContinuation ?: return
         pendingContinuation = null
+        pendingActivity = null
+        continuation.resume(grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)
+    }
+
+    internal fun onActivityDestroyed(activity: Activity) {
+        if (pendingActivity !== activity) return
+        val continuation = pendingContinuation ?: return
+        pendingContinuation = null
+        pendingActivity = null
+        continuation.resume(false)
     }
 
     internal suspend fun requestWriteStorage(activity: Activity): Boolean =
-        suspendCancellableCoroutine { continuation ->
-            if (pendingContinuation != null) {
-                continuation.resume(false)
-                return@suspendCancellableCoroutine
+        withContext(Dispatchers.Main.immediate) {
+            suspendCancellableCoroutine { continuation ->
+                if (pendingContinuation != null) {
+                    continuation.resume(false)
+                    return@suspendCancellableCoroutine
+                }
+                pendingContinuation = continuation
+                pendingActivity = activity
+                continuation.invokeOnCancellation {
+                    if (pendingContinuation === continuation) {
+                        pendingContinuation = null
+                        pendingActivity = null
+                    }
+                }
+                ActivityCompat.requestPermissions(
+                    activity,
+                    arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                    REQUEST_CODE_WRITE_STORAGE
+                )
             }
-            pendingContinuation = continuation
-            ActivityCompat.requestPermissions(
-                activity,
-                arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                REQUEST_CODE_WRITE_STORAGE
-            )
         }
 }
 

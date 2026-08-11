@@ -134,6 +134,7 @@ actual object System {
     actual suspend fun downloadImage(url: String, fileName: String, subDir: String): Result<String> {
         return withContext(Dispatchers.IO) {
             runCatching {
+                requireSafeDownloadSubDir(subDir)
                 ActivityHolder.ensureInit(application)
 
                 // 下载字节流（带 Referer 与 UA，避免 Pixiv 防盗链 403）

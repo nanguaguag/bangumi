@@ -19,7 +19,9 @@ import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.darwin.Darwin
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsBytes
+import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.Dispatchers
 import okio.Path.Companion.toPath
 import okio.use
@@ -135,7 +137,11 @@ actual object System {
 
     actual suspend fun downloadImage(url: String, fileName: String, subDir: String): Result<String> {
         return runCatching {
-            val bytes = createHttpClient {}.get(url).bodyAsBytes()
+            requireSafeDownloadSubDir(subDir)
+            val bytes = createHttpClient {}.get(url) {
+                header(HttpHeaders.Referrer, "https://www.pixiv.net/")
+                header(HttpHeaders.UserAgent, userAgent())
+            }.bodyAsBytes()
             val dir = fileDirectory() + "/Downloads/$subDir"
             NSFileManager.defaultManager.createDirectoryAtPath(
                 path = dir,
