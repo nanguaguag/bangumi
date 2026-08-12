@@ -8,8 +8,11 @@ struct iOSApp: App {
         WindowGroup {
             ContentView()
                 .onOpenURL { url in
-                    print("📩 收到分享的 URL：\(url)")
-                    iOSAppHelper.shared.handleIncomingImage(url: url)
+                    if url.scheme?.lowercased() == "pixiv" {
+                        PixivDeepLinkKt.handlePixivDeepLink(url: url.absoluteString)
+                    } else {
+                        iOSAppHelper.shared.handleIncomingImage(url: url)
+                    }
                 }
         }
     }

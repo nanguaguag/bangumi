@@ -45,6 +45,21 @@
             <string>UIInterfaceOrientationLandscapeLeft</string>
             <string>UIInterfaceOrientationLandscapeRight</string>
         </array>
+        <key>CFBundleURLTypes</key>
+        <array>
+            <dict>
+                <key>CFBundleTypeRole</key>
+                <string>Viewer</string>
+                <key>CFBundleURLSchemes</key>
+                <array>
+                    <string>pixiv</string>
+                </array>
+            </dict>
+        </array>
+        <key>UIFileSharingEnabled</key>
+        <true />
+        <key>LSSupportsOpeningDocumentsInPlace</key>
+        <true />
         <key>CFBundleDocumentTypes</key>
         <array>
             <dict>

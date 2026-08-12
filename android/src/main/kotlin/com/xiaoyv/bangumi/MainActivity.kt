@@ -11,7 +11,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.lifecycleScope
 import com.xiaoyv.bangumi.shared.component.ExternalUriHandler
-import com.xiaoyv.bangumi.shared.core.utils.debugLog
+import com.xiaoyv.bangumi.shared.StoragePermissionBridge
 import com.xiaoyv.bangumi.shared.core.utils.printTrace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -20,6 +20,7 @@ import kotlinx.coroutines.withContext
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        StoragePermissionBridge.initialize(this)
         enableEdgeToEdge(navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT))
         setContent { App() }
         handleIncomingImage(intent)
@@ -36,11 +37,18 @@ class MainActivity : ComponentActivity() {
      * pixiv://account/login?code=VhCxC-JW8jHhWWFCbb8oAKxEkwOlqngpm3VT500brqg&via=login
      */
     private fun handlePixivUri(intent: Intent) {
-        val action = intent.action.orEmpty()
-        if (action == Intent.ACTION_VIEW) {
-            val uri = intent.data.toString()
-            debugLog { "Uri:$uri" }
+        if (intent.action == Intent.ACTION_VIEW) {
+            intent.dataString?.let(::handlePixivDeepLink)
         }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        StoragePermissionBridge.onRequestPermissionsResult(requestCode, grantResults)
     }
 
     private fun handleIncomingImage(intent: Intent) {
