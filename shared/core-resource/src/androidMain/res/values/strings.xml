@@ -210,7 +210,6 @@
     <string name="login_cookie_invalid">Cookie 无效或已过期，请检查后重试</string>
     <string name="login_cookie_no_session">Cookie 中未找到有效的登录会话</string>
     <string name="login_success">登录成功</string>
-    <string name="index_advance">整合</string>
     <string name="index_featured">精选</string>
     <string name="index_my_index">我的目录</string>
     <string name="index_filter_type">类型</string>

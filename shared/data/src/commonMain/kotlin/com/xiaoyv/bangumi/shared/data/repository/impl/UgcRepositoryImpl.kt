@@ -2,6 +2,7 @@ package com.xiaoyv.bangumi.shared.data.repository.impl
 
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
+import com.xiaoyv.bangumi.shared.core.types.IndexItemType
 import com.xiaoyv.bangumi.shared.core.types.TopicDetailType
 import com.xiaoyv.bangumi.shared.core.types.TimelineTab
 import com.xiaoyv.bangumi.shared.core.types.TimelineTarget
@@ -11,12 +12,14 @@ import com.xiaoyv.bangumi.shared.core.types.list.ListIndexType
 import com.xiaoyv.bangumi.shared.core.utils.awaitAll
 import com.xiaoyv.bangumi.shared.core.utils.bbcodeToHtml
 import com.xiaoyv.bangumi.shared.core.utils.defaultJson
+import com.xiaoyv.bangumi.shared.core.utils.formatDate
 import com.xiaoyv.bangumi.shared.core.utils.parseAsHtml
 import com.xiaoyv.bangumi.shared.core.utils.runResult
 import com.xiaoyv.bangumi.shared.core.utils.toApiPage
 import com.xiaoyv.bangumi.shared.data.api.client.BgmApiClient
 import com.xiaoyv.bangumi.shared.data.manager.app.UserManager
 import com.xiaoyv.bangumi.shared.data.model.request.list.blog.ListBlogParam
+import com.xiaoyv.bangumi.shared.data.model.request.list.index.IndexSearchBody
 import com.xiaoyv.bangumi.shared.data.model.request.list.index.ListIndexParam
 import com.xiaoyv.bangumi.shared.data.model.request.list.index.ListIndexRelatedParam
 import com.xiaoyv.bangumi.shared.data.model.response.bgm.ComposeBlogDisplay
@@ -43,6 +46,7 @@ import com.xiaoyv.bangumi.shared.data.repository.UgcRepository
 import com.xiaoyv.bangumi.shared.data.repository.datasource.createNetworkKeyLimitPagingPager
 import com.xiaoyv.bangumi.shared.data.repository.datasource.createNetworkOffsetLimitPagingPager
 import com.xiaoyv.bangumi.shared.data.repository.datasource.createNetworkPageLimitPagingPager
+import com.xiaoyv.bangumi.shared.data.repository.datasource.createNetworkFilteredPageLimitPagingPager
 import com.xiaoyv.bangumi.shared.data.repository.datasource.createPagingConfig
 import io.ktor.client.statement.bodyAsText
 import kotlinx.serialization.json.jsonObject
@@ -207,6 +211,23 @@ class UgcRepositoryImpl(
     }
 
     override fun fetchIndexPager(param: ListIndexParam): Pager<Int, ComposeIndex> {
+        val useBrowserFilters = param.type == ListIndexType.BROWSER && param.browserFilter.hasFilters
+        if (useBrowserFilters) {
+            return createNetworkFilteredPageLimitPagingPager(
+                pagingConfig = createPagingConfig(20),
+                keySelector = { it.id },
+                onLoadData = { page ->
+                    val data = with(indexParser) {
+                        client.requestWebApi {
+                            fetchIndexBorwser(orderby = param.browserOrder, page = page)
+                                .fetchIndexListConverted()
+                        }.getOrThrow()
+                    }
+                    data.filter { it.matches(param.browserFilter) } to data.isNotEmpty()
+                }
+            )
+        }
+
         return createNetworkPageLimitPagingPager(
             pagingConfig = createPagingConfig(20),
             onlyOnePage = true,
@@ -252,6 +273,7 @@ class UgcRepositoryImpl(
                             client.appApi.fetchSearchIndex(
                                 keyword = param.search.keyword,
                                 exact = param.search.exact,
+                                order = param.search.order,
                                 type = param.search.type,
                                 year = param.search.year,
                                 page = page,
@@ -264,6 +286,37 @@ class UgcRepositoryImpl(
                 }
             }
         )
+    }
+
+    private fun ComposeIndex.matches(filter: IndexSearchBody): Boolean {
+        val typeCount = when (filter.type) {
+            "anime" -> category[IndexItemType.SUBJECT_TYPE_2]
+            "book" -> category[IndexItemType.SUBJECT_TYPE_1]
+            "music" -> category[IndexItemType.SUBJECT_TYPE_3]
+            "game" -> category[IndexItemType.SUBJECT_TYPE_4]
+            "real" -> category[IndexItemType.SUBJECT_TYPE_6]
+            "character" -> category[IndexItemType.SUBJECT_TYPE_CHARACTER]
+            "person" -> category[IndexItemType.SUBJECT_TYPE_PERSON]
+            "ep" -> category[IndexItemType.SUBJECT_TYPE_EP]
+            "blog" -> category[IndexItemType.SUBJECT_TYPE_BLOG]
+            "topic" -> (category[IndexItemType.SUBJECT_TYPE_GROUP_TOPIC] ?: 0) +
+                (category[IndexItemType.SUBJECT_TYPE_SUBJECT_TOPIC] ?: 0)
+            else -> null
+        }
+        val typeMatch = filter.type.isBlank() || (typeCount ?: 0) > 0
+
+        val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
+        val yearMatch = when {
+            filter.year.isBlank() -> true
+            filter.year == "1y" -> updatedAt >= now - 365L * 24 * 60 * 60 * 1000
+            filter.year == "3y" -> updatedAt >= now - 3L * 365 * 24 * 60 * 60 * 1000
+            else -> updatedAt > 0 && updatedAt.formatDate("yyyy") == filter.year
+        }
+
+        val keywordMatch = filter.keyword.isBlank() ||
+            title.contains(filter.keyword, ignoreCase = true) ||
+            desc.contains(filter.keyword, ignoreCase = true)
+        return typeMatch && yearMatch && keywordMatch
     }
 
     override fun fetchIndexRelatePager(param: ListIndexRelatedParam): Pager<Int, ComposeIndexRelated> {

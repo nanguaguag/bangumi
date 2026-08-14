@@ -1,6 +1,7 @@
 package com.xiaoyv.bangumi.shared.data.model.response.bgm.index
 
 import androidx.compose.runtime.Immutable
+import com.xiaoyv.bangumi.shared.core.utils.formatMills
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -70,6 +71,7 @@ data class ComposeCatalogItem(
             id = id.toLong(),
             title = title,
             desc = date,
+            updatedAt = lastUpdate.formatMills(),
             total = total,
             category = kotlinx.collections.immutable.persistentMapOf(
                 "anime" to anime,

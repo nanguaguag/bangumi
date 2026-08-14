@@ -10,10 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.rounded.Search
-import com.xiaoyv.bangumi.shared.ui.theme.BgmIcons
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,12 +25,10 @@ import com.xiaoyv.bangumi.core_resource.resources.Res
 import com.xiaoyv.bangumi.core_resource.resources.index_filter_keyword
 import com.xiaoyv.bangumi.core_resource.resources.index_filter_type
 import com.xiaoyv.bangumi.core_resource.resources.index_filter_year
-import com.xiaoyv.bangumi.core_resource.resources.index_my_index
 import com.xiaoyv.bangumi.features.index.page.page.IndexPageRoute
 import com.xiaoyv.bangumi.features.main.tab.home.business.HomeEvent
 import com.xiaoyv.bangumi.features.main.tab.home.business.HomeState
 import com.xiaoyv.bangumi.shared.core.types.IndexHomepageType
-import com.xiaoyv.bangumi.shared.data.manager.shared.LocalSharedState
 import com.xiaoyv.bangumi.shared.ui.component.chip.DropMenuChip
 import com.xiaoyv.bangumi.shared.ui.component.navigation.Screen
 import com.xiaoyv.bangumi.shared.ui.component.pager.BgmChipHorizontalPager
@@ -45,7 +39,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
 import org.jetbrains.compose.resources.stringResource
 
-// ---- 整合模式筛选选项 ----
+// ---- 目录筛选选项 ----
 
 private val indexFilterTypeOptions = persistentListOf(
     ComposeTextTab(type = "", labelText = "不限"),
@@ -194,12 +188,10 @@ fun HomeIndexScreen(
     onUiEvent: (HomeEvent.UI) -> Unit,
     onActionEvent: (HomeEvent.Action) -> Unit,
 ) {
-    val sharedState = LocalSharedState.current
-
     // 当前选中的 Tab 索引
     var selectedTabIndex by remember { mutableStateOf(0) }
 
-    // 筛选状态（精选和整合模式共用）
+    // 筛选状态（精选、最热和最新模式共用）
     var filterType by remember { mutableStateOf("") }
     var filterYear by remember { mutableStateOf("") }
     var filterKeyword by remember { mutableStateOf("") }
@@ -209,42 +201,23 @@ fun HomeIndexScreen(
         mainHomeIndexFilters[selectedTabIndex].type
     } else ""
 
-    // 精选或整合模式显示筛选工具栏
-    val showFilters = currentTabType == IndexHomepageType.FEATURED || currentTabType == IndexHomepageType.ADVANCE
+    // 筛选工具栏在精选、最热和最新模式显示
+    val showFilters = currentTabType == IndexHomepageType.FEATURED ||
+        currentTabType == IndexHomepageType.HOT ||
+        currentTabType == IndexHomepageType.NEWEST
 
     val typePrefix = stringResource(Res.string.index_filter_type)
     val yearPrefix = stringResource(Res.string.index_filter_year)
     val keywordPrefix = stringResource(Res.string.index_filter_keyword)
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // 顶部工具栏：我的目录图标入口
-        if (sharedState.isLogin) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(
-                    onClick = { onUiEvent(HomeEvent.UI.OnNavScreen(Screen.Profile)) },
-                ) {
-                    Icon(
-                        imageVector = BgmIcons.Search,
-                        contentDescription = stringResource(Res.string.index_my_index),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-
         BgmChipHorizontalPager(
             modifier = Modifier.fillMaxSize(),
             tabs = mainHomeIndexFilters,
             onTabSelected = { selectedTabIndex = it },
             extra = if (showFilters) {
                 {
-                    // 精选/整合模式下的筛选工具栏：类型、时间、关键词
+                    // 筛选工具栏：类型、时间、关键词
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -285,22 +258,14 @@ fun HomeIndexScreen(
                         onUiEvent = onUiEvent,
                     )
                 }
-                // 整合模式：有关键词时用搜索 API，无关键词时用浏览 API
-                IndexHomepageType.ADVANCE -> {
+                // 最热/最新：无筛选时使用网页浏览结果，有筛选时在网页结果上客户端过滤
+                else -> {
                     val param = state.rememberListIndexParam(
                         order = order,
                         filterType = filterType,
                         filterYear = filterYear,
                         filterKeyword = filterKeyword,
                     )
-                    IndexPageRoute(
-                        param = param,
-                        onNavScreen = { screen -> onUiEvent(HomeEvent.UI.OnNavScreen(screen)) },
-                    )
-                }
-                // 热门/最新：使用浏览 API
-                else -> {
-                    val param = state.rememberListIndexParam(order = order)
                     IndexPageRoute(
                         param = param,
                         onNavScreen = { screen -> onUiEvent(HomeEvent.UI.OnNavScreen(screen)) },

@@ -30,6 +30,20 @@ fun <T : Any, K> createNetworkPageLimitPagingPager(
     }
 )
 
+fun <T : Any, K> createNetworkFilteredPageLimitPagingPager(
+    pagingConfig: PagingConfig,
+    onLoadData: suspend (Int) -> Pair<List<T>, Boolean>,
+    keySelector: ((T) -> K)? = null,
+): Pager<Int, T> = Pager(
+    config = pagingConfig,
+    pagingSourceFactory = {
+        FilteredPageLimitDataSource(
+            onLoadData = onLoadData,
+            keySelector = keySelector
+        )
+    }
+)
+
 fun <T : Any, K> createNetworkOffsetLimitPagingPager(
     pagingConfig: PagingConfig,
     keySelector: ((T) -> K)? = null,
@@ -81,6 +95,32 @@ class PageLimitDataSource<T : Any, K>(
                 data = loadData,
                 prevKey = if (page > 1) page - 1 else null,
                 nextKey = if (loadData.isEmpty()) null else page + 1,
+            )
+        } catch (e: Exception) {
+            return LoadResult.Error(e)
+        }
+    }
+}
+
+class FilteredPageLimitDataSource<T : Any, K>(
+    private val onLoadData: suspend (Int) -> Pair<List<T>, Boolean>,
+    private val keySelector: ((T) -> K)? = null,
+) : PagingSource<Int, T>() {
+    private val initialKey = 1
+    private val seen = mutableSetOf<K>()
+
+    override fun getRefreshKey(state: PagingState<Int, T>) = null
+
+    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, T> {
+        try {
+            val page = params.key ?: initialKey
+            if (page <= 1) seen.clear()
+            val (data, hasMore) = onLoadData(page)
+            val loadData = if (keySelector == null) data else data.filter { seen.add(keySelector(it)) }
+            return LoadResult.Page(
+                data = loadData,
+                prevKey = if (page > 1) page - 1 else null,
+                nextKey = if (hasMore) page + 1 else null,
             )
         } catch (e: Exception) {
             return LoadResult.Error(e)

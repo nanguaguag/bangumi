@@ -36,6 +36,12 @@ data class ListIndexParam(
     val browserOrder: String = "",
 
     /**
+     * 网页浏览结果需要执行的筛选条件
+     */
+    @SerialName("browserFilter")
+    val browserFilter: IndexSearchBody = IndexSearchBody.Empty,
+
+    /**
      * [ListIndexType.Companion.SEARCH] 搜索目录
      */
     @SerialName("search")

@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.xiaoyv.bangumi.features.main.tab.home.business.HomeEvent
+import com.xiaoyv.bangumi.shared.core.utils.formatMills
 import com.xiaoyv.bangumi.shared.data.model.response.bgm.index.ComposeCatalogItem
 import com.xiaoyv.bangumi.shared.data.repository.IndexRepository
 import com.xiaoyv.bangumi.shared.ui.component.navigation.Screen
@@ -23,7 +24,7 @@ import org.koin.compose.koinInject
 /**
  * 精选目录页面
  *
- * 使用离线 protobuf 数据，支持客户端筛选（类型/时间/关键词）
+ * 使用离线目录数据，支持客户端筛选（类型/时间/关键词）
  */
 @Composable
 fun HomeFeaturedScreen(
@@ -47,22 +48,33 @@ fun HomeFeaturedScreen(
 
     // 客户端筛选
     val filteredCatalogs = remember(allCatalogs, filterType, filterYear, filterKeyword) {
+        val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
+        val oneYearAgo = now - 365L * 24 * 60 * 60 * 1000
+        val threeYearsAgo = now - 3L * 365 * 24 * 60 * 60 * 1000
+
         allCatalogs.filter { item ->
-            // 类型筛选
-            val typeMatch = filterType.isBlank() || item.primaryType == filterType
+            // 类型筛选：目录可能同时包含多种类型，不能只比较数量最多的类型
+            val typeMatch = filterType.isBlank() || when (filterType) {
+                "anime" -> item.anime > 0
+                "book" -> item.book > 0
+                "game" -> item.game > 0
+                "music" -> item.music > 0
+                "real" -> item.real > 0
+                "character" -> item.character > 0
+                "person" -> item.person > 0
+                "topic" -> item.topic > 0
+                "ep" -> item.episode > 0
+                "blog" -> item.blog > 0
+                else -> false
+            }
 
             // 时间筛选
+            val updatedAt = item.lastUpdate.formatMills()
             val yearMatch = when {
                 filterYear.isBlank() -> true
-                filterYear == "1y" -> {
-                    val lastYear = java.time.LocalDate.now().minusYears(1)
-                    parseDate(item.lastUpdate) >= lastYear
-                }
-                filterYear == "3y" -> {
-                    val threeYearsAgo = java.time.LocalDate.now().minusYears(3)
-                    parseDate(item.lastUpdate) >= threeYearsAgo
-                }
-                else -> item.lastUpdate.contains(filterYear)
+                filterYear == "1y" -> updatedAt >= oneYearAgo
+                filterYear == "3y" -> updatedAt >= threeYearsAgo
+                else -> item.lastUpdate.startsWith("$filterYear-")
             }
 
             // 关键词筛选
@@ -87,24 +99,5 @@ fun HomeFeaturedScreen(
                 onClick = { onUiEvent(HomeEvent.UI.OnNavScreen(Screen.IndexDetail(item.id.toLong()))) },
             )
         }
-    }
-}
-
-/** 解析日期字符串为 LocalDate */
-private fun parseDate(dateStr: String): java.time.LocalDate {
-    return try {
-        // 格式: "2026-4-7" 或 "2026-04-07"
-        val parts = dateStr.split("-")
-        if (parts.size == 3) {
-            java.time.LocalDate.of(
-                parts[0].toInt(),
-                parts[1].toInt(),
-                parts[2].toInt()
-            )
-        } else {
-            java.time.LocalDate.MIN
-        }
-    } catch (e: Exception) {
-        java.time.LocalDate.MIN
     }
 }

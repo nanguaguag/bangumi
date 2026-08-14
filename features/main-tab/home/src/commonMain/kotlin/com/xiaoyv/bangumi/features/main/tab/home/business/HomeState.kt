@@ -74,25 +74,25 @@ data class HomeState(
         filterKeyword: String = "",
     ): ListIndexParam {
         return remember(order, filterType, filterYear, filterKeyword) {
-            if (order == IndexHomepageType.ADVANCE && filterKeyword.isNotBlank()) {
-                // 整合模式 + 有关键词：使用搜索 API
+            val hasFilters = filterType.isNotBlank() ||
+                filterYear.isNotBlank() ||
+                filterKeyword.isNotBlank()
+
+            if (hasFilters) {
+                // 最热/最新的筛选在网页目录结果上执行，支持空关键词及类型、时间组合筛选
                 ListIndexParam(
-                    type = ListIndexType.SEARCH,
-                    search = IndexSearchBody(
+                    type = ListIndexType.BROWSER,
+                    browserOrder = order,
+                    browserFilter = IndexSearchBody(
                         keyword = filterKeyword,
                         exact = false,
-                        order = "updated_at",
+                        order = if (order == IndexHomepageType.HOT) "collects" else "updated_at",
                         type = filterType,
                         year = filterYear,
                     )
                 )
-            } else if (order == IndexHomepageType.ADVANCE) {
-                // 整合模式 + 无关键词：回退到浏览 API（按更新时间排序）
-                ListIndexParam(
-                    type = ListIndexType.BROWSER,
-                    browserOrder = ""
-                )
             } else {
+                // 没有筛选条件时保留网页浏览 API，维持最热/最新原有排序和分页行为
                 ListIndexParam(
                     type = ListIndexType.BROWSER,
                     browserOrder = order

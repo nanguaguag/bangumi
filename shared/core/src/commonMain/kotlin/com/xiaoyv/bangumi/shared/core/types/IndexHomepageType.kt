@@ -4,7 +4,6 @@ import androidx.annotation.StringDef
 
 @StringDef(
     IndexHomepageType.FEATURED,
-    IndexHomepageType.ADVANCE,
     IndexHomepageType.HOT,
     IndexHomepageType.NEWEST
 )
@@ -12,7 +11,6 @@ import androidx.annotation.StringDef
 annotation class IndexHomepageType {
     companion object {
         const val FEATURED = "featured"
-        const val ADVANCE = "advance"
         const val NEWEST = ""
         const val HOT = "collect"
     }

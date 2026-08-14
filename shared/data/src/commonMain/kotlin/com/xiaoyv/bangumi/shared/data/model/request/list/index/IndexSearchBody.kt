@@ -13,6 +13,9 @@ data class IndexSearchBody(
     @SerialName("type") val type: String = "",
     @SerialName("year") val year: String = "",
 ) {
+    val hasFilters: Boolean
+        get() = keyword.isNotBlank() || type.isNotBlank() || year.isNotBlank()
+
     companion object {
         val Empty = IndexSearchBody()
     }
