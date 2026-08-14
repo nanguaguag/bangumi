@@ -310,7 +310,7 @@ class BgmApiClient(
 
                 loadTokens {
                     val token = preferenceStore.userToken
-                    if (token.accessToken.isBlank() || token.refreshToken.isBlank() || token.isExpire) null else {
+                    if (token.accessToken.isBlank() || token.isExpire) null else {
                         BearerTokens(accessToken = token.accessToken, refreshToken = token.refreshToken)
                     }
                 }
@@ -325,7 +325,7 @@ class BgmApiClient(
                         if (authToken.isSuccess) token = authToken.getOrThrow()
                     }
 
-                    if (token == ComposeAuthToken.Empty) {
+                    if (token == ComposeAuthToken.Empty && preferenceStore.userInfo.formHash.isNotBlank()) {
                         token = createBgmToken(preferenceStore.userInfo.formHash).getOrThrow()
                     }
 

@@ -39,7 +39,8 @@ data class ComposeAuthToken(
     val isExpire: Boolean
         get() {
             if (accessToken.isBlank()) return true
-            if (refreshToken.isBlank()) return true
+            // expiresIn 为 0 表示由用户手动提供的长期 Access Token。
+            if (expiresIn <= 0) return false
             return System.currentTimeMillis() > (saveAt + expiresIn * 1000)
         }
 }

@@ -180,13 +180,16 @@ class SignInViewModel(
             return@action
         }
 
+        val previousUser = userManager.userInfo
+        val previousToken = userManager.userToken
         reduceContent { state.copy(altLoginRunning = true) }
 
         runCatching {
             // 1. 构造 Token 对象并保存
             val authToken = ComposeAuthToken(
                 accessToken = token,
-                expiresIn = 604800,
+                // 开发者页面提供的 Access Token 没有 refresh token，按长期 token 保存。
+                expiresIn = 0,
                 tokenType = "Bearer",
                 saveAt = com.xiaoyv.bangumi.shared.System.currentTimeMillis()
             )
@@ -199,14 +202,18 @@ class SignInViewModel(
             val fullUser = userRepository.fetchUserInfo(apiUser.username).getOrThrow()
             val userInfo = fullUser.copy(id = apiUser.id, group = apiUser.group)
 
-            // 4. 保存用户信息
+            // 4. 清理旧网页会话，避免 Token 与旧 Cookie 属于不同账号
+            userManager.logout().getOrThrow()
+
+            // 5. 保存用户信息
             userManager.login(userInfo, authToken.copy(userId = apiUser.id))
 
             debugLog { "Token 登录成功: $userInfo" }
 
             userInfo to authToken
         }.onFailure {
-            userManager.setToken(ComposeAuthToken.Empty)
+            // Token 验证失败时恢复登录前状态，避免留下半成品认证状态。
+            userManager.login(previousUser, previousToken)
             reduceContent { state.copy(altLoginRunning = false) }
             postToast { "Token 无效，请检查后重试" }
             debugLog { "Token 登录失败: ${it.message}" }
@@ -248,7 +255,10 @@ class SignInViewModel(
 
         reduceContent { state.copy(altLoginRunning = true) }
 
-        runCatching {
+        try {
+            // 先清理旧会话，避免 Cookie、Token 和用户信息属于不同账号。
+            userManager.logout().getOrThrow()
+
             // 1. 保存 Cookie 到存储
             userRepository.saveCookie(cookieString).getOrThrow()
 
@@ -278,16 +288,14 @@ class SignInViewModel(
 
             debugLog { "Cookie 登录成功: $userInfo" }
 
-            userInfo to loginForm.loginInfo
-        }.onFailure {
+            reduceContent { state.copy(altLoginRunning = false, loginResult = loginForm.loginInfo) }
+            postEffect { SignInSideEffect.OnLoginResult(loginForm.loginInfo) }
+        } catch (e: Throwable) {
+            // Cookie 已写入持久存储时也要清理，避免后续请求继续使用无效或错误账号。
+            userManager.logout()
             reduceContent { state.copy(altLoginRunning = false) }
-            postToast { it.message ?: "Cookie 登录失败" }
-            debugLog { "Cookie 登录失败: ${it.message}" }
-        }.onSuccess {
-            reduceContent {
-                state.copy(altLoginRunning = false, loginResult = it.second)
-            }
-            postEffect { SignInSideEffect.OnLoginResult(it.second) }
+            postToast { e.message ?: "Cookie 登录失败" }
+            debugLog { "Cookie 登录失败: ${e.message}" }
         }
     }
 

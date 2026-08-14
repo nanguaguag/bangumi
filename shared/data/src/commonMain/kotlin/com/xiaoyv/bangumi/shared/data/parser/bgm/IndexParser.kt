@@ -51,6 +51,9 @@ class IndexParser(
             webStateMap[IndexItemType.SUBJECT_TYPE_EP] = stats.select("." + IndexItemType.SUBJECT_TYPE_EP).text().parseCount()
             webStateMap[IndexItemType.SUBJECT_TYPE_CHARACTER] = stats.select("." + IndexItemType.SUBJECT_TYPE_CHARACTER).text().parseCount()
             webStateMap[IndexItemType.SUBJECT_TYPE_PERSON] = stats.select("." + IndexItemType.SUBJECT_TYPE_PERSON).text().parseCount()
+            webStateMap[IndexItemType.SUBJECT_TYPE_BLOG] = stats.select("." + IndexItemType.SUBJECT_TYPE_BLOG).text().parseCount()
+            webStateMap[IndexItemType.SUBJECT_TYPE_GROUP_TOPIC] = stats.select("." + IndexItemType.SUBJECT_TYPE_GROUP_TOPIC).text().parseCount()
+            webStateMap[IndexItemType.SUBJECT_TYPE_SUBJECT_TOPIC] = stats.select("." + IndexItemType.SUBJECT_TYPE_SUBJECT_TOPIC).text().parseCount()
 
             ComposeIndex(
                 id = id,
